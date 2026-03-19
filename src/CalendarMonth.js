@@ -21,7 +21,7 @@ function CalendarMonth({ employees }) {
               const shift = e.schedule.find((s) => s.day === day);
               return shift ? (
                 <div key={e.id} className="mini-shift">
-                  {shift.start}
+                  {e.name} - {shift.start}
                 </div>
               ) : null;
             })}

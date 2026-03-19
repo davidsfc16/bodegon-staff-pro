@@ -40,13 +40,13 @@ body {
 }
 
 .mini-shift {
-  font-size: 12px;
+  font-size: 10px;
   background: #00ffcc;
   color: black;
   margin-top: 3px;
   border-radius: 5px;
   padding: 2px;
-  text-align: center;
+  text-align: left;
 }
 
 .day-details {
