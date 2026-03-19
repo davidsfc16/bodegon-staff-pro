@@ -1,57 +1,65 @@
-.app-container {
-  font-family: 'Arial', sans-serif;
-  padding: 10px;
-  background: linear-gradient(120deg, #fdf6e3, #f1e3d3);
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #2c3e50, #4ca1af);
+  color: white;
+}
+
+.title {
+  text-align: center;
+  margin: 10px 0;
 }
 
 .calendar-month {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
-  margin-bottom: 20px;
+  gap: 8px;
+  padding: 10px;
 }
 
 .calendar-day {
-  border: 1px solid #ccc;
-  padding: 5px;
-  border-radius: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 8px;
+  min-height: 70px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.calendar-day:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.active-day {
+  border: 2px solid #00ffcc;
 }
 
 .day-number {
+  font-size: 14px;
   font-weight: bold;
 }
 
-.employee-card {
-  display: flex;
-  align-items: center;
+.mini-shift {
+  font-size: 12px;
+  background: #00ffcc;
+  color: black;
   margin-top: 3px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  padding: 3px;
+  border-radius: 5px;
+  padding: 2px;
+  text-align: center;
 }
 
-.employee-photo {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  margin-right: 5px;
+.day-details {
+  background: white;
+  color: black;
+  margin: 10px;
+  padding: 10px;
+  border-radius: 12px;
 }
 
-.weekly-summary {
-  margin-top: 20px;
-}
-
-.summary-card {
-  background: #fff;
-  padding: 5px;
-  margin-bottom: 5px;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-
-.mini-graph {
+.detail-card {
   display: flex;
-  height: 10px;
-  margin-top: 3px;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid #ccc;
 }
