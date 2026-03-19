@@ -4,7 +4,7 @@ import WeeklySummary from "./WeeklySummary";
 import "./App.css";
 
 function App() {
-  const [employees, setEmployees] = useState([
+  const [employees] = useState([
     { id: 1, name: "Juan", photo: "/logo.png", schedule: [
       { day: 1, start: "16:00", end: "22:00" },
       { day: 3, start: "16:00", end: "22:00" },
