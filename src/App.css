@@ -63,3 +63,9 @@ body {
   padding: 5px 0;
   border-bottom: 1px solid #ccc;
 }
+
+.working {
+  border:2px solid yellow;
+  font-weight: bold;
+  box-shadow: 0 0 8px yellow;
+}

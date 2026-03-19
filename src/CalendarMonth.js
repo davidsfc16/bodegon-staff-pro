@@ -1,3 +1,20 @@
+
+const isWorkingNow = (shift) => {
+  if (!shift.end) return false;
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMin = now.getMinutes();
+
+  const [startH, startM] = shift.start.split(":").map(Number);
+  const [endH, endM] = shift.end.split(":").map(Number);
+
+  const current = currentHour + currentMin / 60;
+  const start = startH + startM / 60;
+  const end = endH + endM / 60;
+
+  return current >= start && current <= end;
+};
 import React, { useState } from "react";
 
 function CalendarMonth({ employees }) {
@@ -20,7 +37,11 @@ function CalendarMonth({ employees }) {
             {employees.map((e) => {
               const shift = e.schedule.find((s) => s.day === day);
               return shift ? (
-                <div key={e.id} className="mini-shift">
+                <div key={e.id} className={`mini-shift $
+                  {isWorkingNow(shift) ? "working" : ""}
+                  `}
+                  style={{ bacground: e.color }}
+                  >
                   {e.name} - {shift.start}
                 </div>
               ) : null;
