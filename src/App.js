@@ -119,7 +119,7 @@ export default function App() {
                 <strong>{e.name}</strong>
                 <div>Turno activo: {e.active ? "Sí" : "No"}</div>
               </div>
-              <button onClick={() => toggleShift(e)} className={shift-btn ${e.active ? "exit" : "enter"}}>
+              <button onClick={() => toggleShift(e)} className={`shift-btn ${e.active ? "exit" : "enter"}`}>
                 {e.active ? "Salir" : "Entrar"}
               </button>
             </div>
