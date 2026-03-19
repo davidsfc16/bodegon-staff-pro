@@ -1,34 +1,24 @@
 import React from "react";
 
 export default function Calendar({ employees }) {
-  // Crear un objeto de calendario semanal
-  const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-  
-  // Generar matriz: empleados x días
+  const weekDays = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
   return (
-    <div style={{ marginTop: 20 }}>
+    <div className="calendar-panel">
       <h2>📅 Calendario Semanal</h2>
-      <table style={{ width:"100%", borderCollapse:"collapse" }}>
+      <table>
         <thead>
           <tr>
             <th>Empleado</th>
-            {weekDays.map((d,i)=><th key={i}>{d}</th>)}
+            {weekDays.map(d=><th key={d}>{d}</th>)}
           </tr>
         </thead>
         <tbody>
           {employees.map((e,i)=>{
-            const daysWorked = e.sessions.map(s => new Date(s.start).getDay()); // 0=Domingo
+            const daysWorked = e.schedule?.map(s=>s.day)||[];
             return (
               <tr key={i}>
-                <td style={{padding:5}}>{e.name}</td>
-                {weekDays.map((_,idx)=>{
-                  const dayNum = idx+1; // Lun=1 ... Dom=7
-                  return (
-                    <td key={idx} style={{padding:5, textAlign:"center"}}>
-                      {daysWorked.includes(dayNum) ? "✅" : ""}
-                    </td>
-                  )
-                })}
+                <td>{e.name}</td>
+                {weekDays.map(d=><td key={d} style={{textAlign:"center"}}>{daysWorked.includes(d)?"✅":""}</td>)}
               </tr>
             )
           })}
