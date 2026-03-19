@@ -1,16 +1,57 @@
-.app-container { font-family:'Arial'; background:#f2f2f2; padding:20px; min-height:100vh; }
-.app-header { display:flex; align-items:center; gap:10px; justify-content:center; margin-bottom:20px; }
-.logo { width:50px; height:50px; }
-.employee-card { display:flex; align-items:center; justify-content:space-between; background:#fff; padding:15px; margin-bottom:10px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.15); transition: transform 0.2s; }
-.employee-card:hover { transform: scale(1.02); }
-.employee-card.active { border-left:5px solid #2ecc71; }
-.employee-photo { width:50px; height:50px; border-radius:50%; margin-right:10px; }
-.shift-btn { padding:10px 20px; border:none; border-radius:8px; font-weight:bold; color:#fff; cursor:pointer; transition: all 0.2s; }
-.shift-btn.enter { background:#2ecc71; } .shift-btn.enter:hover { background:#27ae60; }
-.shift-btn.exit { background:#e74c3c; } .shift-btn.exit:hover { background:#c0392b; }
-.add-employee, .admin-access, .schedule-panel { margin-top:20px; display:flex; gap:10px; flex-wrap:wrap; }
-.add-employee input, .admin-access input, .schedule-panel input, .schedule-panel select { padding:10px; border-radius:8px; border:1px solid #ccc; flex:1; }
-button { cursor:pointer; }
-.salary { font-weight:bold; color:#34495e; margin-top:5px; }
-table { width:100%; border-collapse:collapse; }
-table th, table td { border:1px solid #ccc; padding:5px; }
+.app-container {
+  font-family: 'Arial', sans-serif;
+  padding: 10px;
+  background: linear-gradient(120deg, #fdf6e3, #f1e3d3);
+}
+
+.calendar-month {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-bottom: 20px;
+}
+
+.calendar-day {
+  border: 1px solid #ccc;
+  padding: 5px;
+  border-radius: 8px;
+}
+
+.day-number {
+  font-weight: bold;
+}
+
+.employee-card {
+  display: flex;
+  align-items: center;
+  margin-top: 3px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  padding: 3px;
+}
+
+.employee-photo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.weekly-summary {
+  margin-top: 20px;
+}
+
+.summary-card {
+  background: #fff;
+  padding: 5px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.mini-graph {
+  display: flex;
+  height: 10px;
+  margin-top: 3px;
+}
