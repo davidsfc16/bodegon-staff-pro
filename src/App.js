@@ -113,7 +113,7 @@ export default function App() {
         <div className="employee-section">
           <h2>Empleados</h2>
           {employees.map((e,i) => (
-            <div key={i} className={employee-card ${e.active ? "active" : ""}}>
+            <div key={i} className={`employee-card ${e.active ? "active" : ""}`}>
               {e.photo && <img src={e.photo} alt={e.name} className="employee-photo"/>}
               <div className="employee-info">
                 <strong>{e.name}</strong>
