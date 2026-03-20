@@ -19,34 +19,53 @@ import React, { useState } from "react";
 
 function CalendarMonth({ employees }) {
   const [selectedDay, setSelectedDay] = useState(null);
-  const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
+  const today = new Date();
+const year = today.getFullYear();
+const month = today.getMonth();
+const monthName = today.toLocaleString("es-ES", { month: "long" });
+
+const daysInMonth = new Date(year, month + 1, 0).getDate();
+const firstDay = new Date(year, month, 1).getDay(); // 0 = domingo
+
+const calendarDays = [];
+
+// Espacios vacíos antes del día 1
+for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) {
+  calendarDays.push(null);
+}
+
+// Días reales
+for (let i = 1; i <= daysInMonth; i++) {
+  calendarDays.push(i);
+}
 
   return (
     <div>
-      <h2 className="title">Calendario</h2>
+      <h2 className="title">{monthName.toLocaleUpperCase()}</h2>
 
       <div className="calendar-month">
-        {daysInMonth.map((day) => (
+        {calendarDays.map((day, index) => (
           <div
-            key={day}
-            className={`calendar-day ${selectedDay === day ? "active-day" : ""}`}
-            onClick={() => setSelectedDay(day)}
-          >
-            <span className="day-number">{day}</span>
+          key={index}
+          className={`calendar-day ${selectedDay === day ? "active-day" : ""}`}
+  onClick={() => day && setSelectedDay(day)}
+>
+  {day && <span className="day-number">{day}</span>}
 
-            {employees.map((e) => {
-              const shift = e.schedule.find((s) => s.day === day);
-              return shift ? (
-                <div key={e.id} className={`mini-shift $
-                  {isWorkingNow(shift) ? "working" : ""}
-                  `}
-                  style={{ bacground: e.color }}
-                  >
-                  {e.name} - {shift.start}
-                </div>
-              ) : null;
-            })}
-          </div>
+  {day &&
+    employees.map((e) => {
+      const shift = e.schedule.find((s) => s.day === day);
+      return shift ? (
+        <div
+          key={e.id}
+          className={`mini-shift ${isWorkingNow(shift) ? "working" : ""}`}
+          style={{ background: e.color }}
+        >
+          {e.name} - {shift.start}
+        </div>
+      ) : null;
+    })}
+</div>
         ))}
       </div>
 
