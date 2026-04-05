@@ -1,88 +1,179 @@
+import { useMemo, useState } from "react";
 
-const isWorkingNow = (shift) => {
-  if (!shift.end) return false;
-
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentMin = now.getMinutes();
-
-  const [startH, startM] = shift.start.split(":").map(Number);
-  const [endH, endM] = shift.end.split(":").map(Number);
-
-  const current = currentHour + currentMin / 60;
-  const start = startH + startM / 60;
-  const end = endH + endM / 60;
-
-  return current >= start && current <= end;
-};
-import React, { useState } from "react";
-
-function CalendarMonth({ employees }) {
-  const [selectedDay, setSelectedDay] = useState(null);
+function CalendarMonth({ employees = [], user = null, onSelectEmployee }) {
   const today = new Date();
-const year = today.getFullYear();
-const month = today.getMonth();
-const monthName = today.toLocaleString("es-ES", { month: "long" });
 
-const daysInMonth = new Date(year, month + 1, 0).getDate();
-const firstDay = new Date(year, month, 1).getDay(); // 0 = domingo
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-const calendarDays = [];
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
 
-// Espacios vacíos antes del día 1
-for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) {
-  calendarDays.push(null);
-}
+  const monthLabel = useMemo(() => {
+    return new Date(currentYear, currentMonth, 1).toLocaleString("es-ES", {
+      month: "long",
+      year: "numeric",
+    });
+  }, [currentMonth, currentYear]);
 
-// Días reales
-for (let i = 1; i <= daysInMonth; i++) {
-  calendarDays.push(i);
-}
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+  const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
+
+  const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+  const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+
+  const weekDays = ["L", "M", "X", "J", "V", "S", "D"];
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+
+  const calendarDays = [];
+
+  for (let i = startOffset - 1; i >= 0; i--) {
+    calendarDays.push({
+      day: daysInPrevMonth - i,
+      month: prevMonth,
+      year: prevMonthYear,
+      isCurrentMonth: false,
+    });
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    calendarDays.push({
+      day,
+      month: currentMonth,
+      year: currentYear,
+      isCurrentMonth: true,
+    });
+  }
+
+  const totalCells = Math.ceil(calendarDays.length / 7) * 7;
+  const extraCells = totalCells - calendarDays.length;
+
+  for (let day = 1; day <= extraCells; day++) {
+    calendarDays.push({
+      day,
+      month: nextMonth,
+      year: nextMonthYear,
+      isCurrentMonth: false,
+    });
+  }
+
+  const getShiftsForDay = (dayObj) => {
+    return employees.flatMap((emp) =>
+      (emp.schedule || [])
+        .filter(
+          (shift) =>
+            Number(shift.day) === Number(dayObj.day) &&
+            Number(shift.month) === Number(dayObj.month) &&
+            Number(shift.year) === Number(dayObj.year)
+        )
+        .map((shift, index) => ({
+          employee: emp,
+          shift,
+          index,
+        }))
+    );
+  };
 
   return (
-    <div>
-      <h2 className="title">{monthName.toLocaleUpperCase()}</h2>
+    <div className="calendar-wrapper">
+      <div className="month-nav">
+  <button
+    className="month-btn"
+    onClick={() => setCurrentDate(new Date(currentYear, currentMonth - 1, 1))}
+  >
+    ←
+  </button>
 
-      <div className="calendar-month">
-        {calendarDays.map((day, index) => (
-          <div
-          key={index}
-          className={`calendar-day ${selectedDay === day ? "active-day" : ""}`}
-  onClick={() => day && setSelectedDay(day)}
->
-  {day && <span className="day-number">{day}</span>}
+  <div className="month-label">{monthLabel}</div>
 
-  {day &&
-    employees.map((e) => {
-      const shift = e.schedule.find((s) => s.day === day);
-      return shift ? (
-        <div
-          key={e.id}
-          className={`mini-shift ${isWorkingNow(shift) ? "working" : ""}`}
-          style={{ background: e.color }}
-        >
-          {e.name} - {shift.start}
-        </div>
-      ) : null;
-    })}
+  <button
+    className="month-btn"
+    onClick={() => setCurrentDate(new Date(currentYear, currentMonth + 1, 1))}
+  >
+    →
+  </button>
 </div>
-        ))}
-      </div>
 
-      {selectedDay && (
-        <div className="day-details">
-          <h3>Día {selectedDay}</h3>
-          {employees.map((e) => {
-            const shift = e.schedule.find((s) => s.day === selectedDay);
-            return shift ? (
-              <div key={e.id} className="detail-card">
-                <span>{e.name}</span>
-                <span>{shift.start} - {shift.end || "Libre salida"}</span>
+      <div className="calendar-scroll">
+        <div className="calendar-weekdays">
+          {weekDays.map((d) => (
+            <div key={d} className="calendar-weekday">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        <div className="calendar-grid">
+          {calendarDays.map((dayObj, index) => {
+            const shifts = getShiftsForDay(dayObj);
+
+            const isToday =
+              dayObj.day === today.getDate() &&
+              dayObj.month === today.getMonth() &&
+              dayObj.year === today.getFullYear();
+
+            return (
+              <div
+                key={index}
+                className={`calendar-cell ${
+                  !dayObj.isCurrentMonth ? "calendar-other-month" : ""
+                }`}
+                style={
+                  isToday
+                    ? {
+                        border: "2px solid #f59e0b",
+                        boxShadow: "0 0 0 3px rgba(245, 158, 11, 0.12)",
+                      }
+                    : undefined
+                }
+                onClick={() => {
+                  onSelectEmployee?.(null, {
+                    day: dayObj.day,
+                    month: dayObj.month,
+                    year: dayObj.year,
+                  });
+                }}
+              >
+                <div className="calendar-day-number">{dayObj.day}</div>
+
+                {shifts.length > 0 && (
+                  <div className="calendar-shifts">
+                    {shifts.map(({ employee, shift, index: shiftIndex }) => {
+                      const isMine = user && user.id === employee.id;
+
+                      return (
+                        <div
+                          key={`${employee.id}-${shiftIndex}`}
+                          className="calendar-shift"
+                          style={{
+                            backgroundColor: employee.color,
+                            outline: isMine ? "2px solid #111827" : "none",
+                          }}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onSelectEmployee?.(employee, shift, shiftIndex);
+                          }}
+                        >
+                          <span className="calendar-shift-name">
+                            {employee.name}
+                          </span>
+                          <span className="calendar-shift-time">
+                            {shift.start}
+                            {shift.end ? ` - ${shift.end}` : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            ) : null;
+            );
           })}
         </div>
-      )}
+      </div>
     </div>
   );
 }
