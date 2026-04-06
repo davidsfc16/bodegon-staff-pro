@@ -50,6 +50,27 @@ function App() {
     "#6366f1",
   ];
 
+  const checkForUpdates = async () => {
+  try {
+    const res = await fetch(`/version.json?t=${Date.now()}`, {
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    if (!currentVersion) {
+      setCurrentVersion(data.version);
+      return;
+    }
+
+    if (data.version !== currentVersion) {
+      setUpdateAvailable(true);
+    }
+  } catch (error) {
+    console.error("No se pudo comprobar actualización:", error);
+  }
+};
+
   const createShiftId = () => {
   return `shift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 };
@@ -91,10 +112,16 @@ function App() {
   const [selectedSettingsEmployeeId, setSelectedSettingsEmployeeId] =
     useState("");
   const [newPinValue, setNewPinValue] = useState("");
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+const [currentVersion, setCurrentVersion] = useState(null);
 
   const vibrate = () => {
     if (navigator.vibrate) navigator.vibrate(10);
   };
+
+  const reloadApp = () => {
+  window.location.reload();
+};
 
   const getAvailableColor = () => {
     const usedColors = employees.map((e) => e.color);
@@ -161,6 +188,16 @@ function App() {
     alert("No se pudo verificar la huella");
   }
 };
+
+useEffect(() => {
+  checkForUpdates();
+
+  const interval = setInterval(() => {
+    checkForUpdates();
+  }, 60000); // cada 60 segundos
+
+  return () => clearInterval(interval);
+}, [currentVersion]);
 
   useEffect(() => {
     const initApp = async () => {
@@ -1259,6 +1296,15 @@ function App() {
             <p className="topbar-user">{isAdmin ? "Modo jefe" : user?.name}</p>
           </div>
         </div>
+
+        {updateAvailable && (
+  <div className="update-banner">
+    <span>Hay una nueva versión disponible.</span>
+    <button className="update-btn" onClick={reloadApp}>
+      Actualizar
+    </button>
+  </div>
+)}
 
         <button
           className="secondary-btn"

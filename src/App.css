@@ -769,3 +769,28 @@ select.input {
   text-transform: capitalize;
   font-size: 16px;
 }
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(251, 146, 60, 0.08);
+}
+
+.update-btn {
+  border: none;
+  background: #0f172a;
+  color: #f59e0b;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
