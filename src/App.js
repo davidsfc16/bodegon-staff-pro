@@ -50,6 +50,10 @@ function App() {
     "#6366f1",
   ];
 
+  const createShiftId = () => {
+  return `shift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+};
+
   const formatHours = (hoursDecimal) => {
     const totalMinutes = Math.round(hoursDecimal * 60);
     const h = Math.floor(totalMinutes / 60);
@@ -117,48 +121,65 @@ function App() {
   };
 
   const loginAdminWithBiometric = async () => {
-    try {
-      const result = await BiometricAuth.checkBiometry();
+  try {
+    const biometricEnabled = await Preferences.get({
+      key: "adminBiometricEnabled",
+    });
 
-      if (!result.isAvailable && !result.deviceIsSecure) {
-        alert("Este móvil no tiene huella o bloqueo seguro configurado");
-        return;
-      }
-
-      await BiometricAuth.authenticate({
-        reason: "Acceder al modo jefe",
-        cancelTitle: "Cancelar",
-        allowDeviceCredentials: true,
-      });
-
-      setIsAdmin(true);
-      setUser(null);
-      setActiveTab("calendar");
-      setAdminPin("");
-
-      await Preferences.set({
-        key: "adminSession",
-        value: JSON.stringify({
-          sessionType: "admin",
-        }),
-      });
-
-      await Preferences.remove({ key: "employeeSession" });
-    } catch (error) {
-      alert("No se pudo verificar la huella");
+    if (biometricEnabled.value !== "true") {
+      alert("Primero debes entrar con PIN en este móvil.");
+      return;
     }
-  };
+
+    const result = await BiometricAuth.checkBiometry();
+
+    if (!result.isAvailable && !result.deviceIsSecure) {
+      alert("Este móvil no tiene huella o bloqueo seguro configurado");
+      return;
+    }
+
+    await BiometricAuth.authenticate({
+      reason: "Acceder al modo jefe",
+      cancelTitle: "Cancelar",
+      allowDeviceCredentials: true,
+    });
+
+    setIsAdmin(true);
+    setUser(null);
+    setActiveTab("calendar");
+    setAdminPin("");
+
+    await Preferences.set({
+      key: "adminSession",
+      value: JSON.stringify({
+        sessionType: "admin",
+      }),
+    });
+
+    await Preferences.remove({ key: "employeeSession" });
+  } catch (error) {
+    alert("No se pudo verificar la huella");
+  }
+};
 
   useEffect(() => {
     const initApp = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "employees"));
-        const data = querySnapshot.docs.map((d) => ({
-          id: Number(d.id),
-          ...d.data(),
-          schedule: d.data().schedule || [],
-          payments: d.data().payments || {},
-        }));
+        const data = querySnapshot.docs.map((d) => {
+  const raw = d.data();
+  const normalizedSchedule = (raw.schedule || []).map((shift) => ({
+    ...shift,
+    id: shift.id || createShiftId(),
+  }));
+
+  return {
+    id: Number(d.id),
+    ...raw,
+    schedule: normalizedSchedule,
+    payments: raw.payments || {},
+  };
+});
 
         setEmployees(data);
 
@@ -254,6 +275,11 @@ function App() {
         }),
       });
 
+      await Preferences.set({
+  key: "adminBiometricEnabled",
+  value: "true",
+});
+
       await Preferences.remove({ key: "employeeSession" });
     } else {
       alert("PIN del jefe incorrecto");
@@ -302,60 +328,65 @@ function App() {
     );
 
   const addShift = async () => {
-    if (!calendarEmployeeId || !calendarStart || calendarFormDay === null) {
-      return;
-    }
+  if (!calendarEmployeeId || !calendarStart || calendarFormDay === null) {
+    return;
+  }
 
-    const updated = employees.map((emp) => {
-      if (emp.id !== Number(calendarEmployeeId)) return emp;
+  const updated = employees.map((emp) => {
+    if (emp.id !== Number(calendarEmployeeId)) return emp;
 
-      const shiftData = {
-        day: Number(calendarFormDay),
-        month: calendarFormMonth,
-        year: calendarFormYear,
-        start: calendarStart,
-        end: calendarEnd || null,
-      };
+    const shiftData = {
+      id: editingFromCalendar?.shiftId || createShiftId(),
+      day: Number(calendarFormDay),
+      month: calendarFormMonth,
+      year: calendarFormYear,
+      start: calendarStart,
+      end: calendarEnd || null,
+    };
 
-      const newSchedule = [...(emp.schedule || [])];
+    const newSchedule = [...(emp.schedule || [])];
 
-      if (
-        editingFromCalendar &&
-        editingFromCalendar.employeeId === emp.id &&
-        editingFromCalendar.index !== null
-      ) {
-        newSchedule[editingFromCalendar.index] = shiftData;
+    if (editingFromCalendar?.shiftId) {
+      const realIndex = newSchedule.findIndex(
+        (shift) => shift.id === editingFromCalendar.shiftId
+      );
+
+      if (realIndex !== -1) {
+        newSchedule[realIndex] = shiftData;
       } else {
         newSchedule.push(shiftData);
       }
+    } else {
+      newSchedule.push(shiftData);
+    }
 
-      return {
-        ...emp,
-        schedule: newSchedule,
-      };
-    });
+    return {
+      ...emp,
+      schedule: newSchedule,
+    };
+  });
 
-    await saveEmployees(updated);
-    closeModal();
-  };
+  await saveEmployees(updated);
+  closeModal();
+};
 
   const deleteShiftFromModal = async () => {
-    if (!editingFromCalendar) return;
+  if (!editingFromCalendar?.shiftId) return;
 
-    const updated = employees.map((emp) => {
-      if (emp.id !== editingFromCalendar.employeeId) return emp;
+  const updated = employees.map((emp) => {
+    if (emp.id !== editingFromCalendar.employeeId) return emp;
 
-      return {
-        ...emp,
-        schedule: (emp.schedule || []).filter(
-          (_, index) => index !== editingFromCalendar.index
-        ),
-      };
-    });
+    return {
+      ...emp,
+      schedule: (emp.schedule || []).filter(
+        (shift) => shift.id !== editingFromCalendar.shiftId
+      ),
+    };
+  });
 
-    await saveEmployees(updated);
-    closeModal();
-  };
+  await saveEmployees(updated);
+  closeModal();
+};
 
   const finishShift = async () => {
     if (!user) return;
@@ -554,17 +585,17 @@ function App() {
                 }
 
                 if (e && shift) {
-                  setCalendarFormDay(shift.day);
-                  setCalendarFormMonth(shift.month);
-                  setCalendarFormYear(shift.year);
-                  setCalendarEmployeeId(String(e.id));
-                  setCalendarStart(shift.start || "");
-                  setCalendarEnd(shift.end || "");
-                  setEditingFromCalendar({
-                    employeeId: e.id,
-                    index,
-                  });
-                }
+  setCalendarFormDay(shift.day);
+  setCalendarFormMonth(shift.month);
+  setCalendarFormYear(shift.year);
+  setCalendarEmployeeId(String(e.id));
+  setCalendarStart(shift.start || "");
+  setCalendarEnd(shift.end || "");
+  setEditingFromCalendar({
+    employeeId: e.id,
+    shiftId: shift.id,
+  });
+}
               }}
             />
           </section>
