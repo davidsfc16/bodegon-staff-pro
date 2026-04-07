@@ -194,7 +194,7 @@ const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
 
 useEffect(() => {
   const run = async () => {
-    await checkVersion();
+    await checkForUpdates();
   };
   run();
 }, []);
