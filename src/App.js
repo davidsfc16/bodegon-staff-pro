@@ -193,6 +193,13 @@ const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
 };
 
 useEffect(() => {
+  const run = async () => {
+    await checkVersion();
+  };
+  run();
+}, []);
+
+useEffect(() => {
   if (!isAdmin) return;
 
   const today = new Date();
