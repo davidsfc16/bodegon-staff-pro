@@ -75,6 +75,8 @@ function App() {
   return `shift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 };
 
+const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null);
+
   const formatHours = (hoursDecimal) => {
     const totalMinutes = Math.round(hoursDecimal * 60);
     const h = Math.floor(totalMinutes / 60);
@@ -114,6 +116,7 @@ function App() {
   const [newPinValue, setNewPinValue] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState(false);
 const [currentVersion, setCurrentVersion] = useState(null);
+const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
 
   const vibrate = () => {
     if (navigator.vibrate) navigator.vibrate(10);
@@ -188,6 +191,24 @@ const [currentVersion, setCurrentVersion] = useState(null);
     alert("No se pudo verificar la huella");
   }
 };
+
+useEffect(() => {
+  if (!isAdmin) return;
+
+  const today = new Date();
+  const isWednesday = today.getDay() === 3; // miércoles
+
+  if (!isWednesday) return;
+
+  const hasPending = employees.some((emp) => {
+    const payments = emp.payments || {};
+    return Object.values(payments).some((p) => !p?.paid);
+  });
+
+  if (hasPending) {
+    alert("⚠️ Hay empleados con semanas pendientes de pago");
+  }
+}, [employees, isAdmin]);
 
 useEffect(() => {
   checkForUpdates();
@@ -356,6 +377,18 @@ useEffect(() => {
 
     return nowMinutes >= shiftMinutes;
   };
+
+  const updateEmployeeColor = async (color) => {
+  if (!selectedSettingsEmployeeId) return;
+
+  const updated = employees.map((emp) =>
+    emp.id === Number(selectedSettingsEmployeeId)
+      ? { ...emp, color }
+      : emp
+  );
+
+  await saveEmployees(updated);
+};
 
   const hasOpenShift =
     !isAdmin &&
@@ -877,51 +910,65 @@ useEffect(() => {
           <h2 className="section-title">Histórico de pagos</h2>
 
           {employees.map((emp) => {
-            const payments = emp.payments || {};
-            const weeks = Object.keys(payments).sort().reverse();
+  const payments = emp.payments || {};
+  const weeks = Object.keys(payments);
 
-            if (weeks.length === 0) return null;
+  const hasPending = weeks.some((w) => !payments[w]?.paid);
+  const isSelected = selectedHistoryEmployeeId === emp.id;
 
-            return (
-              <div key={emp.id} style={{ marginBottom: "20px" }}>
-                <h3 style={{ marginBottom: "8px" }}>{emp.name}</h3>
+  return (
+    <div key={emp.id}>
+      <div
+        className="shift-item"
+        onClick={() =>
+          setSelectedHistoryEmployeeId((prev) =>
+            prev === emp.id ? null : emp.id
+          )
+        }
+        style={{
+          cursor: "pointer",
+          background: "#f9fafb",
+          border: "1px solid #e5e7eb",
+        }}
+      >
+        <strong>{emp.name}</strong>
 
-                <div className="shift-list">
-                  {weeks.map((savedWeekKey) => {
-                    const data = payments[savedWeekKey];
+        <div
+          className="status-pill"
+          style={{
+            color: hasPending ? "#f59e0b" : "#16a34a",
+            background: hasPending ? "#fef3c7" : "#dcfce7",
+          }}
+        >
+          {hasPending ? "Pendiente" : "Pagado"}
+        </div>
+      </div>
 
-                    return (
-                      <div key={savedWeekKey} className="shift-item">
-                        <div>
-                          <strong>{savedWeekKey.replace("_", " → ")}</strong>
-                          <div className="shift-time">
-                            Pagado el:{" "}
-                            {data?.paidAt
-                              ? new Date(data.paidAt).toLocaleDateString()
-                              : "-"}
-                          </div>
-                        </div>
+      {isSelected && (
+        <div className="card inner-card">
+          {weeks
+            .sort()
+            .reverse()
+            .map((weekKey) => {
+              const data = payments[weekKey];
 
-                        <div className="shift-item-pay">
-                          {Number(data.amount || 0).toFixed(2)} €
-                        </div>
+              return (
+                <div key={weekKey} className="shift-item">
+                  <strong>{weekKey.replace("_", " → ")}</strong>
 
-                        <div
-                          className="status-pill"
-                          style={{
-                            color: "#16a34a",
-                            background: "#dcfce7",
-                          }}
-                        >
-                          ✔ Pagado
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div>{Number(data.amount || 0).toFixed(2)} €</div>
+
+                  <div className="status-pill">
+                    {data?.paid ? "✔ Pagado" : "Pendiente"}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+        </div>
+      )}
+    </div>
+  );
+})}
         </section>
       );
     }
@@ -1008,32 +1055,64 @@ useEffect(() => {
                     Crear empleado
                   </button>
 
-                  <h3 className="subsection-title" style={{ marginTop: "24px" }}>
-                    Borrar empleado
-                  </h3>
+                  <h3 className="subsection-title">Cambiar color</h3>
 
-                  <div className="shift-list">
-                    {employees.map((emp) => (
-                      <div key={emp.id} className="shift-item">
-                        <div className="shift-item-name">
-                          <span
-                            className="employee-dot"
-                            style={{ backgroundColor: emp.color }}
-                          />
-                          <strong>{emp.name}</strong>
-                        </div>
+<select
+  className="input"
+  value={selectedSettingsEmployeeId}
+  onChange={(e) => setSelectedSettingsEmployeeId(e.target.value)}
+>
+  <option value="">Selecciona empleado</option>
+  {employees.map((emp) => (
+    <option key={emp.id} value={emp.id}>
+      {emp.name}
+    </option>
+  ))}
+</select>
 
-                        <button
-                          className="danger-btn"
-                          onClick={() => deleteEmployee(emp.id)}
-                        >
-                          Borrar
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+<div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+  {COLOR_PALETTE.map((color) => (
+    <div
+      key={color}
+      onClick={() => updateEmployeeColor(color)}
+      style={{
+        width: "28px",
+        height: "28px",
+        borderRadius: "50%",
+        backgroundColor: color,
+        cursor: "pointer",
+      }}
+    />
+  ))}
+</div>
+
+                  <h3 className="subsection-title">Borrar empleado</h3>
+
+<button
+  className="secondary-btn"
+  onClick={() => setShowDeleteEmployees((prev) => !prev)}
+>
+  {showDeleteEmployees ? "Ocultar" : "Ver empleados"}
+</button>
+
+{showDeleteEmployees && (
+  <div className="shift-list">
+    {employees.map((emp) => (
+      <div key={emp.id} className="shift-item">
+        <strong>{emp.name}</strong>
+
+        <button
+          className="danger-btn"
+          onClick={() => deleteEmployee(emp.id)}
+        >
+          Borrar
+        </button>
+      </div>
+    ))}
+  </div>
+)}
+  </>
+)}
 
               {settingsTab === "pins" && (
                 <>

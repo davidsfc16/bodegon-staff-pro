@@ -366,23 +366,33 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+
+  padding: 8px 10px;   /* antes sería más grande */
+  border-radius: 10px;
+
+  font-size: 14px;
+  min-height: auto;
+
   background: #f9fafb;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 12px 14px;
-  transition: all 0.18s ease;
+  border: 1px solid #e5e7eb;
+
+  gap: 10px;
+}
+
+.shift-item:hover {
+  background: #f3f4f6;
 }
 
 .shift-item-name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 14px;
 }
 
 .shift-item-pay {
-  font-weight: 800;
-  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .employee-card {
