@@ -50,26 +50,7 @@ function App() {
     "#6366f1",
   ];
 
-  const checkForUpdates = useCallback(async () => {
-  try {
-    const res = await fetch(`/version.json?t=${Date.now()}`, {
-      cache: "no-store",
-    });
-
-    const data = await res.json();
-
-    if (!currentVersion) {
-      setCurrentVersion(data.version);
-      return;
-    }
-
-    if (data.version !== currentVersion) {
-      setUpdateAvailable(true);
-    }
-  } catch (error) {
-    console.error("No se pudo comprobar actualización:", error);
-  }
-}, [currentVersion]);
+  
 
   const createShiftId = () => {
   return `shift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -117,6 +98,27 @@ const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null)
   const [updateAvailable, setUpdateAvailable] = useState(false);
 const [currentVersion, setCurrentVersion] = useState(null);
 const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
+
+const checkForUpdates = useCallback(async () => {
+  try {
+    const res = await fetch(`/version.json?t=${Date.now()}`, {
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    if (!currentVersion) {
+      setCurrentVersion(data.version);
+      return;
+    }
+
+    if (data.version !== currentVersion) {
+      setUpdateAvailable(true);
+    }
+  } catch (error) {
+    console.error("No se pudo comprobar actualización:", error);
+  }
+}, [currentVersion]);
 
   const vibrate = () => {
     if (navigator.vibrate) navigator.vibrate(10);
