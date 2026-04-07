@@ -225,7 +225,7 @@ useEffect(() => {
   }, 60000); // cada 60 segundos
 
   return () => clearInterval(interval);
-}, [currentVersion]);
+}, []);
 
   useEffect(() => {
     const initApp = async () => {
