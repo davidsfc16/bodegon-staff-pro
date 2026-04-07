@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
 import { Preferences } from "@capacitor/preferences";
 import {
@@ -50,7 +50,7 @@ function App() {
     "#6366f1",
   ];
 
-  const checkForUpdates = async () => {
+  const checkForUpdates = useCallback(async () => {
   try {
     const res = await fetch(`/version.json?t=${Date.now()}`, {
       cache: "no-store",
@@ -69,7 +69,7 @@ function App() {
   } catch (error) {
     console.error("No se pudo comprobar actualización:", error);
   }
-};
+}, [currentVersion]);
 
   const createShiftId = () => {
   return `shift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -192,12 +192,6 @@ const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
   }
 };
 
-useEffect(() => {
-  const run = async () => {
-    await checkForUpdates();
-  };
-  run();
-}, []);
 
 useEffect(() => {
   if (!isAdmin) return;
@@ -225,7 +219,7 @@ useEffect(() => {
   }, 60000); // cada 60 segundos
 
   return () => clearInterval(interval);
-}, []);
+}, [checkForUpdates]);
 
   useEffect(() => {
     const initApp = async () => {
