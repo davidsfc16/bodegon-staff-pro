@@ -16,13 +16,28 @@ exports.notifyShiftEndedPushBg = onDocumentUpdated(
     let endedShift = null;
 
     for (const newShift of afterSchedule) {
-      const oldShift = beforeSchedule.find((s) => s.id === newShift.id);
+      const oldShift = beforeSchedule.find((s) => {
+        if (newShift.id && s.id) {
+          return s.id === newShift.id;
+        }
+
+        return (
+          s.day === newShift.day &&
+          s.month === newShift.month &&
+          s.year === newShift.year &&
+          s.start === newShift.start
+        );
+      });
 
       if (oldShift && !oldShift.end && newShift.end) {
         endedShift = newShift;
         break;
       }
     }
+
+    console.log("beforeSchedule:", JSON.stringify(beforeSchedule));
+    console.log("afterSchedule:", JSON.stringify(afterSchedule));
+    console.log("endedShift:", JSON.stringify(endedShift));
 
     if (!endedShift) return;
 
@@ -32,6 +47,9 @@ exports.notifyShiftEndedPushBg = onDocumentUpdated(
       .get();
 
     const token = adminDeviceDoc.data()?.token;
+
+    console.log("token exists:", !!token);
+
     if (!token) return;
 
     const employeeName = after.name || "Empleado";
@@ -46,6 +64,8 @@ exports.notifyShiftEndedPushBg = onDocumentUpdated(
         priority: "high",
       },
     });
+
+    console.log("push enviada OK");
   }
 );
 
@@ -213,6 +233,36 @@ exports.notifyPendingPaymentsWednesday = onSchedule(
       android: {
         priority: "high",
       },
+    });
+  }
+);
+
+exports.dailyEmployeesBackup = onSchedule(
+  {
+    schedule: "0 5 * * *",
+    timeZone: "Europe/Madrid",
+  },
+  async () => {
+    const employeesSnap = await admin.firestore().collection("employees").get();
+
+    const employees = employeesSnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    const now = new Date();
+
+    const backupId = `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(
+      now.getHours()
+    ).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+
+    await admin.firestore().collection("backups").doc(backupId).set({
+      createdAt: now.toISOString(),
+      type: "daily-employees-backup",
+      employeesCount: employees.length,
+      employees,
     });
   }
 );

@@ -6,8 +6,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
+  limit,
   onSnapshot,
+  orderBy,
+  query,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -100,6 +105,7 @@ const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null)
 const [currentVersion, setCurrentVersion] = useState(null);
 const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
 const [savingShift, setSavingShift] = useState(false);
+const [restoringBackup, setRestoringBackup] = useState(false);
 const [toast, setToast] = useState("");
 const showToast = (msg) => {
   setToast(msg);
@@ -710,6 +716,56 @@ useEffect(() => {
   setNewPinValue("");
 };
 
+const restoreLatestBackup = async () => {
+  if (restoringBackup) return;
+
+  const ok = window.confirm(
+    "¿Seguro que quieres restaurar la última copia de seguridad? Esto sobrescribirá los empleados actuales."
+  );
+  if (!ok) return;
+
+  setRestoringBackup(true);
+
+  try {
+    const backupQuery = query(
+      collection(db, "backups"),
+      orderBy("createdAt", "desc"),
+      limit(1)
+    );
+
+    const backupSnap = await getDocs(backupQuery);
+
+    if (backupSnap.empty) {
+      showToast("No hay copias de seguridad");
+      return;
+    }
+
+    const latestBackup = backupSnap.docs[0].data();
+    const backupEmployees = latestBackup.employees || [];
+
+    const currentEmployeesSnap = await getDocs(collection(db, "employees"));
+    const batch = writeBatch(db);
+
+    currentEmployeesSnap.forEach((empDoc) => {
+      batch.delete(doc(db, "employees", empDoc.id));
+    });
+
+    backupEmployees.forEach((emp) => {
+      const empId = String(emp.id);
+      batch.set(doc(db, "employees", empId), emp);
+    });
+
+    await batch.commit();
+
+    showToast("Copia restaurada correctamente ✔");
+  } catch (error) {
+    console.error("Error restaurando backup:", error);
+    showToast("Error al restaurar copia");
+  } finally {
+    setRestoringBackup(false);
+  }
+};
+
   const deleteEmployee = async (employeeId) => {
   if (!window.confirm("¿Seguro que quieres borrar este empleado?")) return;
 
@@ -1229,6 +1285,18 @@ useEffect(() => {
         >
           Borrar
         </button>
+
+        <h3 className="subsection-title" style={{ marginTop: "20px" }}>
+  Copia de seguridad
+</h3>
+
+<button
+  className="secondary-btn"
+  onClick={restoreLatestBackup}
+  disabled={restoringBackup}
+>
+  {restoringBackup ? "Restaurando..." : "Restaurar última copia"}
+</button>
       </div>
     ))}
   </div>
