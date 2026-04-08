@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
+import { PushNotifications } from "@capacitor/push-notifications";
 import { Preferences } from "@capacitor/preferences";
 import {
   collection,
   deleteDoc,
   doc,
-  getDocs,
+  onSnapshot,
   setDoc,
 } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -98,6 +99,12 @@ const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null)
   const [updateAvailable, setUpdateAvailable] = useState(false);
 const [currentVersion, setCurrentVersion] = useState(null);
 const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
+const [savingShift, setSavingShift] = useState(false);
+const [toast, setToast] = useState("");
+const showToast = (msg) => {
+  setToast(msg);
+  setTimeout(() => setToast(""), 2000);
+};
 
 const checkForUpdates = useCallback(async () => {
   try {
@@ -139,6 +146,18 @@ const checkForUpdates = useCallback(async () => {
     return COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
   };
 
+  const saveSingleEmployee = async (updatedEmployee) => {
+  await setDoc(doc(db, "employees", String(updatedEmployee.id)), updatedEmployee);
+
+  setEmployees((prev) =>
+    prev.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp))
+  );
+
+  if (user?.id === updatedEmployee.id) {
+    setUser(updatedEmployee);
+  }
+};
+
   const saveEmployees = async (updatedEmployees) => {
     setEmployees(updatedEmployees);
 
@@ -151,6 +170,60 @@ const checkForUpdates = useCallback(async () => {
       setUser(refreshedUser || null);
     }
   };
+
+  const registerAdminPush = async () => {
+  try {
+
+    const permStatus = await PushNotifications.checkPermissions();
+
+    let finalStatus = permStatus.receive;
+
+    if (finalStatus !== "granted") {
+      const req = await PushNotifications.requestPermissions();
+      finalStatus = req.receive;
+      alert("PERMISO DESPUÉS DE PEDIR: " + finalStatus);
+    }
+
+    if (finalStatus !== "granted") {
+      alert("PERMISO DENEGADO");
+      return;
+    }
+
+    await PushNotifications.register();
+  } catch (error) {
+    console.error("Error registrando push:", error);
+    alert("ERROR EN registerAdminPush");
+  }
+};
+const setupAdminPushListeners = () => {
+  PushNotifications.removeAllListeners();
+
+  PushNotifications.addListener("registration", async (token) => {
+    console.log("TOKEN:", token.value);
+
+    try {
+      await setDoc(doc(db, "adminDevice", "main"), {
+        token: token.value,
+        updatedAt: new Date().toISOString(),
+        platform: "android",
+      });
+      alert("TOKEN GUARDADO");
+    } catch (error) {
+      console.error("Error guardando token push:", error);
+      alert("ERROR GUARDANDO TOKEN");
+    }
+  });
+
+  PushNotifications.addListener("registrationError", (err) => {
+    console.error("Error registro push:", err);
+    alert("ERROR REGISTRO PUSH");
+  });
+
+  PushNotifications.addListener("pushNotificationReceived", (notification) => {
+    console.log("Push recibida:", notification);
+  });
+};
+
 
   const loginAdminWithBiometric = async () => {
   try {
@@ -189,11 +262,16 @@ const checkForUpdates = useCallback(async () => {
     });
 
     await Preferences.remove({ key: "employeeSession" });
+    await registerAdminPush();
   } catch (error) {
     alert("No se pudo verificar la huella");
   }
 };
 
+
+useEffect(() => {
+  setupAdminPushListeners();
+}, []);
 
 useEffect(() => {
   if (!isAdmin) return;
@@ -224,60 +302,74 @@ useEffect(() => {
 }, [checkForUpdates]);
 
   useEffect(() => {
-    const initApp = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "employees"));
-        const data = querySnapshot.docs.map((d) => {
-  const raw = d.data();
-  const normalizedSchedule = (raw.schedule || []).map((shift) => ({
-    ...shift,
-    id: shift.id || createShiftId(),
-  }));
+  let unsubscribeEmployees = null;
 
-  return {
-    id: Number(d.id),
-    ...raw,
-    schedule: normalizedSchedule,
-    payments: raw.payments || {},
-  };
-});
+  const initApp = async () => {
+    try {
+      const savedEmployeeSession = await Preferences.get({
+        key: "employeeSession",
+      });
 
-        setEmployees(data);
+      const savedAdminSession = await Preferences.get({
+        key: "adminSession",
+      });
 
-        const savedEmployeeSession = await Preferences.get({
-          key: "employeeSession",
-        });
+      unsubscribeEmployees = onSnapshot(
+        collection(db, "employees"),
+        (querySnapshot) => {
+          const data = querySnapshot.docs.map((d) => {
+            const raw = d.data();
+            const normalizedSchedule = (raw.schedule || []).map((shift) => ({
+              ...shift,
+              id: shift.id || createShiftId(),
+            }));
 
-        const savedAdminSession = await Preferences.get({
-          key: "adminSession",
-        });
+            return {
+              id: Number(d.id),
+              ...raw,
+              schedule: normalizedSchedule,
+              payments: raw.payments || {},
+            };
+          });
 
-        if (savedAdminSession.value) {
-          setIsAdmin(true);
-          setUser(null);
-          setActiveTab("calendar");
-          return;
-        }
+          setEmployees(data);
 
-        if (savedEmployeeSession.value) {
-          const parsed = JSON.parse(savedEmployeeSession.value);
-          const found = data.find((emp) => emp.id === parsed.employeeId);
-
-          if (found) {
-            setUser(found);
-            setIsAdmin(false);
+          if (savedAdminSession.value) {
+            setIsAdmin(true);
+            setUser(null);
             setActiveTab("calendar");
-          }
-        }
-      } catch (error) {
-        console.error("Error cargando empleados:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+          } else if (savedEmployeeSession.value) {
+            const parsed = JSON.parse(savedEmployeeSession.value);
+            const found = data.find((emp) => emp.id === parsed.employeeId);
 
-    initApp();
-  }, []);
+            if (found) {
+              setUser(found);
+              setIsAdmin(false);
+              setActiveTab("calendar");
+            } else {
+              setUser(null);
+            }
+          }
+
+          setLoading(false);
+        },
+        (error) => {
+          console.error("Error escuchando empleados:", error);
+          setLoading(false);
+        }
+      );
+    } catch (error) {
+      console.error("Error iniciando app:", error);
+      setLoading(false);
+    }
+  };
+
+  initApp();
+
+  return () => {
+    if (unsubscribeEmployees) unsubscribeEmployees();
+  };
+}, []);
 
   const Modal = ({ children }) =>
     ReactDOM.createPortal(
@@ -323,30 +415,32 @@ useEffect(() => {
   };
 
   const loginAdmin = async () => {
-    if (adminPin === ADMIN_PIN) {
-      setIsAdmin(true);
-      setUser(null);
-      setActiveTab("calendar");
-      setAdminPin("");
+  if (adminPin === ADMIN_PIN) {
 
-      await Preferences.set({
-        key: "adminSession",
-        value: JSON.stringify({
-          sessionType: "admin",
-        }),
-      });
+    setIsAdmin(true);
+    setUser(null);
+    setActiveTab("calendar");
+    setAdminPin("");
 
-      await Preferences.set({
-  key: "adminBiometricEnabled",
-  value: "true",
-});
+    await Preferences.set({
+      key: "adminSession",
+      value: JSON.stringify({
+        sessionType: "admin",
+      }),
+    });
 
-      await Preferences.remove({ key: "employeeSession" });
-    } else {
-      alert("PIN del jefe incorrecto");
-    }
-  };
+    await Preferences.set({
+      key: "adminBiometricEnabled",
+      value: "true",
+    });
 
+    await Preferences.remove({ key: "employeeSession" });
+
+    await registerAdminPush();
+  } else {
+    alert("PIN del jefe incorrecto");
+  }
+};
   const logout = async () => {
     setUser(null);
     setIsAdmin(false);
@@ -384,13 +478,17 @@ useEffect(() => {
   const updateEmployeeColor = async (color) => {
   if (!selectedSettingsEmployeeId) return;
 
-  const updated = employees.map((emp) =>
-    emp.id === Number(selectedSettingsEmployeeId)
-      ? { ...emp, color }
-      : emp
+  const employee = employees.find(
+    (emp) => emp.id === Number(selectedSettingsEmployeeId)
   );
+  if (!employee) return;
 
-  await saveEmployees(updated);
+  const updatedEmployee = {
+    ...employee,
+    color,
+  };
+
+  await saveSingleEmployee(updatedEmployee);
 };
 
   const hasOpenShift =
@@ -401,64 +499,73 @@ useEffect(() => {
     );
 
   const addShift = async () => {
+  if (savingShift) return;
   if (!calendarEmployeeId || !calendarStart || calendarFormDay === null) {
     return;
   }
 
-  const updated = employees.map((emp) => {
-    if (emp.id !== Number(calendarEmployeeId)) return emp;
+  setSavingShift(true);
 
-    const shiftData = {
-      id: editingFromCalendar?.shiftId || createShiftId(),
-      day: Number(calendarFormDay),
-      month: calendarFormMonth,
-      year: calendarFormYear,
-      start: calendarStart,
-      end: calendarEnd || null,
-    };
+  try {
+    const updated = employees.map((emp) => {
+      if (emp.id !== Number(calendarEmployeeId)) return emp;
 
-    const newSchedule = [...(emp.schedule || [])];
+      const shiftData = {
+        id: editingFromCalendar?.shiftId || createShiftId(),
+        day: Number(calendarFormDay),
+        month: calendarFormMonth,
+        year: calendarFormYear,
+        start: calendarStart,
+        end: calendarEnd || null,
+      };
 
-    if (editingFromCalendar?.shiftId) {
-      const realIndex = newSchedule.findIndex(
-        (shift) => shift.id === editingFromCalendar.shiftId
-      );
+      const newSchedule = [...(emp.schedule || [])];
 
-      if (realIndex !== -1) {
-        newSchedule[realIndex] = shiftData;
+      if (editingFromCalendar?.shiftId) {
+        const i = newSchedule.findIndex(
+          (s) => s.id === editingFromCalendar.shiftId
+        );
+        if (i !== -1) newSchedule[i] = shiftData;
+        else newSchedule.push(shiftData);
       } else {
         newSchedule.push(shiftData);
       }
-    } else {
-      newSchedule.push(shiftData);
-    }
 
-    return {
-      ...emp,
-      schedule: newSchedule,
-    };
-  });
+      return { ...emp, schedule: newSchedule };
+    });
 
-  await saveEmployees(updated);
-  closeModal();
+    await saveEmployees(updated);
+    closeModal();
+    showToast("Turno guardado ✔");
+  } finally {
+    setSavingShift(false);
+  }
 };
 
   const deleteShiftFromModal = async () => {
+  if (savingShift) return;
   if (!editingFromCalendar?.shiftId) return;
 
-  const updated = employees.map((emp) => {
-    if (emp.id !== editingFromCalendar.employeeId) return emp;
+  setSavingShift(true);
 
-    return {
-      ...emp,
-      schedule: (emp.schedule || []).filter(
-        (shift) => shift.id !== editingFromCalendar.shiftId
-      ),
-    };
-  });
+  try {
+    const updated = employees.map((emp) => {
+      if (emp.id !== editingFromCalendar.employeeId) return emp;
 
-  await saveEmployees(updated);
-  closeModal();
+      return {
+        ...emp,
+        schedule: (emp.schedule || []).filter(
+          (s) => s.id !== editingFromCalendar.shiftId
+        ),
+      };
+    });
+
+    await saveEmployees(updated);
+    closeModal();
+    showToast("Turno borrado 🗑️");
+  } finally {
+    setSavingShift(false);
+  }
 };
 
   const finishShift = async () => {
@@ -528,42 +635,42 @@ useEffect(() => {
   }, [employees, weekStart, weekEnd]);
 
   const markWeekAsPaid = async (employeeId) => {
-    const updated = employees.map((emp) => {
-      if (emp.id !== employeeId) return emp;
+  const employee = employees.find((emp) => emp.id === employeeId);
+  if (!employee) return;
 
-      const stats = calculateWeeklyHours(emp.schedule || [], weekStart, weekEnd);
+  const stats = calculateWeeklyHours(employee.schedule || [], weekStart, weekEnd);
 
-      return {
-        ...emp,
-        payments: {
-          ...(emp.payments || {}),
-          [weekKey]: {
-            paid: true,
-            amount: stats.totalPay,
-            paidAt: new Date().toISOString(),
-          },
-        },
-      };
-    });
-
-    await saveEmployees(updated);
+  const updatedEmployee = {
+    ...employee,
+    payments: {
+      ...(employee.payments || {}),
+      [weekKey]: {
+        paid: true,
+        amount: stats.totalPay,
+        paidAt: new Date().toISOString(),
+        weekStart: weekStart.toISOString(),
+        weekEnd: weekEnd.toISOString(),
+      },
+    },
   };
+
+  await saveSingleEmployee(updatedEmployee);
+};
 
   const unmarkWeekAsPaid = async (employeeId) => {
-    const updated = employees.map((emp) => {
-      if (emp.id !== employeeId) return emp;
+  const employee = employees.find((emp) => emp.id === employeeId);
+  if (!employee) return;
 
-      const newPayments = { ...(emp.payments || {}) };
-      delete newPayments[weekKey];
+  const newPayments = { ...(employee.payments || {}) };
+  delete newPayments[weekKey];
 
-      return {
-        ...emp,
-        payments: newPayments,
-      };
-    });
-
-    await saveEmployees(updated);
+  const updatedEmployee = {
+    ...employee,
+    payments: newPayments,
   };
+
+  await saveSingleEmployee(updatedEmployee);
+};
 
   const addEmployee = async () => {
     if (!newEmployeeName.trim()) return;
@@ -587,24 +694,30 @@ useEffect(() => {
   };
 
   const changeEmployeePin = async () => {
-    if (!selectedSettingsEmployeeId || !newPinValue.trim()) return;
+  if (!selectedSettingsEmployeeId || !newPinValue.trim()) return;
 
-    const updated = employees.map((emp) =>
-      emp.id === Number(selectedSettingsEmployeeId)
-        ? { ...emp, pin: newPinValue.trim() }
-        : emp
-    );
+  const employee = employees.find(
+    (emp) => emp.id === Number(selectedSettingsEmployeeId)
+  );
+  if (!employee) return;
 
-    await saveEmployees(updated);
-    setNewPinValue("");
+  const updatedEmployee = {
+    ...employee,
+    pin: newPinValue.trim(),
   };
 
-  const deleteEmployee = async (employeeId) => {
-    if (!window.confirm("¿Seguro que quieres borrar este empleado?")) return;
+  await saveSingleEmployee(updatedEmployee);
+  setNewPinValue("");
+};
 
-    const updated = employees.filter((emp) => emp.id !== employeeId);
-    await saveEmployees(updated);
-    await deleteDoc(doc(db, "employees", String(employeeId)));
+  const deleteEmployee = async (employeeId) => {
+  if (!window.confirm("¿Seguro que quieres borrar este empleado?")) return;
+
+  const updated = employees.filter((emp) => emp.id !== employeeId);
+  await saveEmployees(updated);
+  await deleteDoc(doc(db, "employees", String(employeeId)));
+
+
 
     if (selectedSettingsEmployeeId === String(employeeId)) {
       setSelectedSettingsEmployeeId("");
@@ -614,6 +727,7 @@ useEffect(() => {
     if (selectedTeamEmployeeId === employeeId) {
       setSelectedTeamEmployeeId(null);
     }
+    showToast("Empleado borrado 🗑️");
   };
 
   const navItems = isAdmin
@@ -711,9 +825,13 @@ useEffect(() => {
               </div>
 
               <div className="row">
-                <button className="primary-btn" onClick={addShift}>
-                  Guardar turno
-                </button>
+                <button
+  className="primary-btn"
+  onClick={addShift}
+  disabled={savingShift}
+>
+  {savingShift ? "Guardando..." : "Guardar turno"}
+</button>
 
                 <button className="secondary-btn" onClick={closeModal}>
                   Cancelar
@@ -722,12 +840,13 @@ useEffect(() => {
 
               {editingFromCalendar && (
                 <button
-                  className="danger-btn"
-                  style={{ marginTop: "12px", width: "100%" }}
-                  onClick={deleteShiftFromModal}
-                >
-                  Borrar turno
-                </button>
+  className="danger-btn"
+  style={{ marginTop: "12px", width: "100%" }}
+  onClick={deleteShiftFromModal}
+  disabled={savingShift}
+>
+  {savingShift ? "Borrando..." : "Borrar turno"}
+</button>
               )}
             </Modal>
           )}
@@ -1244,7 +1363,7 @@ useEffect(() => {
       <div className="login-screen">
         <div className="brand-card">
           <img src={logo} alt="Kiosco Bodegón" className="brand-logo" />
-          <h1 className="brand-title">Kiosco Bodegón</h1>
+          <h1 className="brand-title">Kiosco Bodegón TEST</h1>
           <p className="brand-subtitle">Cargando datos…</p>
         </div>
       </div>
@@ -1369,78 +1488,85 @@ useEffect(() => {
   }
 
   return (
-    <div className="app-screen">
-      <div className="topbar">
-        <div className="topbar-left">
-          <img src={logo} className="topbar-logo" alt="logo" />
-          <div>
-            <h2 className="topbar-title">Kiosco Bodegón</h2>
-            <p className="topbar-user">{isAdmin ? "Modo jefe" : user?.name}</p>
-          </div>
+  <div className="app-screen">
+    <div className="topbar">
+      <div className="topbar-left">
+        <img src={logo} className="topbar-logo" alt="logo" />
+        <div>
+          <h2 className="topbar-title">Kiosco Bodegón</h2>
+          <p className="topbar-user">{isAdmin ? "Modo jefe" : user?.name}</p>
         </div>
+      </div>
 
-        {updateAvailable && (
-  <div className="update-banner">
-    <span>Hay una nueva versión disponible.</span>
-    <button className="update-btn" onClick={reloadApp}>
-      Actualizar
-    </button>
-  </div>
-)}
+      {updateAvailable && (
+        <div className="update-banner">
+          <span>Hay una nueva versión disponible.</span>
+          <button className="update-btn" onClick={reloadApp}>
+            Actualizar
+          </button>
+        </div>
+      )}
 
-        <button
-          className="secondary-btn"
-          onClick={logout}
-          aria-label="Cerrar sesión"
+      <button
+        className="secondary-btn"
+        onClick={logout}
+        aria-label="Cerrar sesión"
+      >
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+          }}
         >
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
+          <LogOut size={18} />
+          <span className="hide-mobile-label">Salir</span>
+        </span>
+      </button>
+    </div>
+
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={`${activeTab}-${settingsTab}`}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -14 }}
+        transition={{ duration: 0.22 }}
+        className="content"
+      >
+        {renderCurrentTab()}
+      </motion.div>
+    </AnimatePresence>
+
+    <div className="bottom-nav">
+      {navItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = activeTab === item.key;
+
+        return (
+          <button
+            key={item.key}
+            className={`bottom-nav-btn ${isActive ? "active" : ""}`}
+            onClick={() => {
+              vibrate();
+              setActiveTab(item.key);
             }}
           >
-            <LogOut size={18} />
-            <span className="hide-mobile-label">Salir</span>
-          </span>
-        </button>
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${activeTab}-${settingsTab}`}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -14 }}
-          transition={{ duration: 0.22 }}
-          className="content"
-        >
-          {renderCurrentTab()}
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="bottom-nav">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.key;
-
-          return (
-            <button
-              key={item.key}
-              className={`bottom-nav-btn ${isActive ? "active" : ""}`}
-              onClick={() => {
-                vibrate();
-                setActiveTab(item.key);
-              }}
-            >
-              <Icon size={20} className="bottom-nav-icon" />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+            <Icon size={20} className="bottom-nav-icon" />
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
     </div>
-  );
+
+    {toast && (
+      <div className="toast">
+        {toast}
+      </div>
+    )}
+  </div>
+);
 }
+
 
 export default App;

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "298619681230",
+    "project_id": "kbodegon-app",
+    "storage_bucket": "kbodegon-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:298619681230:android:29f5a0e4468a6de41e539f",
+        "android_client_info": {
+          "package_name": "com.bodegon.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCqId-j-cBFnzrMSvLEtTM3cWiJZlP-U4A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
