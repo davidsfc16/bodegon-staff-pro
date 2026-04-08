@@ -1285,8 +1285,11 @@ const restoreLatestBackup = async () => {
         >
           Borrar
         </button>
-
-        <h3 className="subsection-title" style={{ marginTop: "20px" }}>
+      </div>
+    ))}
+  </div>
+)}
+<h3 className="subsection-title" style={{ marginTop: "20px" }}>
   Copia de seguridad
 </h3>
 
@@ -1297,10 +1300,6 @@ const restoreLatestBackup = async () => {
 >
   {restoringBackup ? "Restaurando..." : "Restaurar última copia"}
 </button>
-      </div>
-    ))}
-  </div>
-)}
   </>
 )}
 
