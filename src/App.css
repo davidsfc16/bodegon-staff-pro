@@ -366,16 +366,12 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  padding: 8px 10px;   /* antes sería más grande */
+  padding: 8px 10px;
   border-radius: 10px;
-
   font-size: 14px;
   min-height: auto;
-
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-
   gap: 10px;
 }
 
@@ -486,23 +482,64 @@ select.input {
 }
 
 .calendar-wrapper {
-  width: 100%;
-  animation: fadeUp 0.22s ease;
+  position: relative;
 }
 
-.calendar-scroll {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+.calendar-fixed-header {
+  position: sticky;
+  top: 76px;
+  z-index: 40;
+  background: #fff;
   padding-bottom: 8px;
 }
 
-.calendar-weekdays {
+.calendar-header-scroll {
+  overflow: hidden;
+}
+
+.calendar-body-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.calendar-header-inner,
+.calendar-body-inner {
+  width: max-content;
   min-width: 840px;
+}
+
+.month-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+.month-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: none;
+  background: #0f172a;
+  color: #f59e0b;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.month-label {
+  font-weight: 800;
+  text-transform: capitalize;
+  font-size: 16px;
+}
+
+.calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(120px, 1fr));
   gap: 8px;
-  margin-bottom: 6px;
+  background: #fff;
 }
 
 .calendar-weekday {
@@ -513,7 +550,6 @@ select.input {
 }
 
 .calendar-grid {
-  min-width: 840px;
   display: grid;
   grid-template-columns: repeat(7, minmax(120px, 1fr));
   gap: 8px;
@@ -703,6 +739,23 @@ select.input {
   }
 }
 
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* ===== RESPONSIVE ===== */
 
 @media (max-width: 900px) {
@@ -743,41 +796,23 @@ select.input {
     font-size: 28px;
   }
 
-  .calendar-weekdays,
-  .calendar-grid {
-    min-width: 780px;
-    grid-template-columns: repeat(7, minmax(110px, 1fr));
-  }
-
   .calendar-cell {
     min-height: 88px;
   }
+
+  .calendar-header-inner,
+.calendar-body-inner {
+  min-width: 780px;
 }
 
-.month-nav {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
+.calendar-weekdays,
+.calendar-grid {
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
 }
 
-.month-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  border: none;
-  background: #0f172a;
-  color: #f59e0b;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
+.calendar-fixed-header {
+  top: 72px;
 }
-
-.month-label {
-  font-weight: 800;
-  text-transform: capitalize;
-  font-size: 16px;
 }
 
 .update-banner {
@@ -803,4 +838,41 @@ select.input {
   padding: 10px 14px;
   font-weight: 800;
   cursor: pointer;
+}
+
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  z-index: 9999;
+  animation: fadeInOut 2s ease;
+}
+
+/* ===== CALENDARIO FIJO BIEN HECHO ===== */
+
+.calendar-fixed {
+  position: sticky;
+  top: 76px;
+  z-index: 40;
+  background: #fff;
+  padding-bottom: 8px;
+}
+
+/* IMPORTANTE: sincroniza ancho */
+.calendar-fixed,
+.calendar-grid {
+  min-width: 840px;
+}
+
+/* scroll horizontal sigue funcionando */
+.calendar-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
 }

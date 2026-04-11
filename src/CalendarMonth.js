@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 function CalendarMonth({ employees = [], user = null, onSelectEmployee }) {
   const today = new Date();
-
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  const headerScrollRef = useRef(null);
+  const bodyScrollRef = useRef(null);
 
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
@@ -61,117 +63,144 @@ function CalendarMonth({ employees = [], user = null, onSelectEmployee }) {
   }
 
   const getShiftsForDay = (dayObj) => {
-    return employees.flatMap((emp) =>
-      (emp.schedule || [])
-        .filter(
-          (shift) =>
-            Number(shift.day) === Number(dayObj.day) &&
-            Number(shift.month) === Number(dayObj.month) &&
-            Number(shift.year) === Number(dayObj.year)
-        )
-        .map((shift, index) => ({
-          employee: emp,
-          shift,
-          index,
-        }))
-    );
+    return employees
+      .flatMap((emp) =>
+        (emp.schedule || [])
+          .filter(
+            (shift) =>
+              Number(shift.day) === Number(dayObj.day) &&
+              Number(shift.month) === Number(dayObj.month) &&
+              Number(shift.year) === Number(dayObj.year)
+          )
+          .map((shift, index) => ({
+            employee: emp,
+            shift,
+            index,
+          }))
+      )
+      .sort((a, b) => {
+        const aStart = a.shift?.start || "99:99";
+        const bStart = b.shift?.start || "99:99";
+        return aStart.localeCompare(bStart);
+      });
+  };
+
+  const syncHeaderScroll = () => {
+    if (!headerScrollRef.current || !bodyScrollRef.current) return;
+    headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
   };
 
   return (
     <div className="calendar-wrapper">
-      <div className="month-nav">
-  <button
-    className="month-btn"
-    onClick={() => setCurrentDate(new Date(currentYear, currentMonth - 1, 1))}
-  >
-    ←
-  </button>
+      <div className="calendar-fixed-header">
+        <div className="month-nav">
+          <button
+            className="month-btn"
+            onClick={() =>
+              setCurrentDate(new Date(currentYear, currentMonth - 1, 1))
+            }
+          >
+            ←
+          </button>
 
-  <div className="month-label">{monthLabel}</div>
+          <div className="month-label">{monthLabel}</div>
 
-  <button
-    className="month-btn"
-    onClick={() => setCurrentDate(new Date(currentYear, currentMonth + 1, 1))}
-  >
-    →
-  </button>
-</div>
-
-      <div className="calendar-scroll">
-        <div className="calendar-weekdays">
-          {weekDays.map((d) => (
-            <div key={d} className="calendar-weekday">
-              {d}
-            </div>
-          ))}
+          <button
+            className="month-btn"
+            onClick={() =>
+              setCurrentDate(new Date(currentYear, currentMonth + 1, 1))
+            }
+          >
+            →
+          </button>
         </div>
 
-        <div className="calendar-grid">
-          {calendarDays.map((dayObj, index) => {
-            const shifts = getShiftsForDay(dayObj);
+        <div className="calendar-header-scroll" ref={headerScrollRef}>
+          <div className="calendar-header-inner">
+            <div className="calendar-weekdays">
+              {weekDays.map((d) => (
+                <div key={d} className="calendar-weekday">
+                  {d}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
-            const isToday =
-              dayObj.day === today.getDate() &&
-              dayObj.month === today.getMonth() &&
-              dayObj.year === today.getFullYear();
+      <div
+        className="calendar-body-scroll"
+        ref={bodyScrollRef}
+        onScroll={syncHeaderScroll}
+      >
+        <div className="calendar-body-inner">
+          <div className="calendar-grid">
+            {calendarDays.map((dayObj, index) => {
+              const shifts = getShiftsForDay(dayObj);
 
-            return (
-              <div
-                key={index}
-                className={`calendar-cell ${
-                  !dayObj.isCurrentMonth ? "calendar-other-month" : ""
-                }`}
-                style={
-                  isToday
-                    ? {
-                        border: "2px solid #f59e0b",
-                        boxShadow: "0 0 0 3px rgba(245, 158, 11, 0.12)",
-                      }
-                    : undefined
-                }
-                onClick={() => {
-                  onSelectEmployee?.(null, {
-                    day: dayObj.day,
-                    month: dayObj.month,
-                    year: dayObj.year,
-                  });
-                }}
-              >
-                <div className="calendar-day-number">{dayObj.day}</div>
+              const isToday =
+                dayObj.day === today.getDate() &&
+                dayObj.month === today.getMonth() &&
+                dayObj.year === today.getFullYear();
 
-                {shifts.length > 0 && (
-                  <div className="calendar-shifts">
-                    {shifts.map(({ employee, shift, index: shiftIndex }) => {
-                      const isMine = user && user.id === employee.id;
+              return (
+                <div
+                  key={index}
+                  className={`calendar-cell ${
+                    !dayObj.isCurrentMonth ? "calendar-other-month" : ""
+                  }`}
+                  style={
+                    isToday
+                      ? {
+                          border: "2px solid #f59e0b",
+                          boxShadow: "0 0 0 3px rgba(245, 158, 11, 0.12)",
+                        }
+                      : undefined
+                  }
+                  onClick={() => {
+                    onSelectEmployee?.(null, {
+                      day: dayObj.day,
+                      month: dayObj.month,
+                      year: dayObj.year,
+                    });
+                  }}
+                >
+                  <div className="calendar-day-number">{dayObj.day}</div>
 
-                      return (
-                        <div
-                          key={`${employee.id}-${shiftIndex}`}
-                          className="calendar-shift"
-                          style={{
-                            backgroundColor: employee.color,
-                            outline: isMine ? "2px solid #111827" : "none",
-                          }}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            onSelectEmployee?.(employee, shift, shiftIndex);
-                          }}
-                        >
-                          <span className="calendar-shift-name">
-                            {employee.name}
-                          </span>
-                          <span className="calendar-shift-time">
-                            {shift.start}
-                            {shift.end ? ` - ${shift.end}` : ""}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  {shifts.length > 0 && (
+                    <div className="calendar-shifts">
+                      {shifts.map(({ employee, shift, index: shiftIndex }) => {
+                        const isMine = user && user.id === employee.id;
+
+                        return (
+                          <div
+                            key={`${employee.id}-${shiftIndex}`}
+                            className="calendar-shift"
+                            style={{
+                              backgroundColor: employee.color,
+                              outline: isMine ? "2px solid #111827" : "none",
+                            }}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onSelectEmployee?.(employee, shift, shiftIndex);
+                            }}
+                          >
+                            <span className="calendar-shift-name">
+                              {employee.name}
+                            </span>
+                            <span className="calendar-shift-time">
+                              {shift.start}
+                              {shift.end ? ` - ${shift.end}` : ""}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

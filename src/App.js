@@ -213,7 +213,6 @@ const setupAdminPushListeners = () => {
         updatedAt: new Date().toISOString(),
         platform: "android",
       });
-      alert("TOKEN GUARDADO");
     } catch (error) {
       console.error("Error guardando token push:", error);
       alert("ERROR GUARDANDO TOKEN");
