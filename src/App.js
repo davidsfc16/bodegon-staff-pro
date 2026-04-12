@@ -479,27 +479,7 @@ useEffect(() => {
     await Preferences.remove({ key: "employeeSession" });
     await Preferences.remove({ key: "adminSession" });
   };
-
-  const isTodayShift = (shift) => {
-    const now = new Date();
-    return (
-      shift.day === now.getDate() &&
-      shift.month === now.getMonth() &&
-      shift.year === now.getFullYear()
-    );
-  };
-
-  const hasShiftStarted = (shift) => {
-    if (!shift.start) return false;
-
-    const now = new Date();
-    const [h, m] = shift.start.split(":").map(Number);
-    const shiftMinutes = h * 60 + m;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-    return nowMinutes >= shiftMinutes;
-  };
-
+  
   const updateEmployeeColor = async (color) => {
   if (!selectedSettingsEmployeeId) return;
 
