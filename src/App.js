@@ -4,6 +4,7 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { Preferences } from "@capacitor/preferences";
 import {
   collection,
+  addDoc,
   deleteDoc,
   doc,
   getDocs,
@@ -28,7 +29,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { BiometricAuth } from "@aparajita/capacitor-biometric-auth";
-
 import { db } from "./firebase";
 import CalendarMonth from "./CalendarMonth";
 import {
@@ -107,6 +107,27 @@ const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
 const [savingShift, setSavingShift] = useState(false);
 const [restoringBackup, setRestoringBackup] = useState(false);
 const [toast, setToast] = useState("");
+const shouldBackup = () => {
+  const last = localStorage.getItem("lastBackup");
+
+  if (!last) return true;
+
+  const diff = Date.now() - Number(last);
+  return diff > 6 * 60 * 60 * 1000; // 6 horas
+};
+
+const hacerBackup = async (employees) => {
+  try {
+    await addDoc(collection(db, "backups"), {
+      employees,
+      createdAt: new Date().toISOString(),
+    });
+
+    console.log("Backup guardado ✔");
+  } catch (err) {
+    console.error("Error backup", err);
+  }
+};
 const showToast = (msg) => {
   setToast(msg);
   setTimeout(() => setToast(""), 2000);
@@ -198,7 +219,6 @@ const checkForUpdates = useCallback(async () => {
     await PushNotifications.register();
   } catch (error) {
     console.error("Error registrando push:", error);
-    alert("ERROR EN registerAdminPush");
   }
 };
 const setupAdminPushListeners = () => {
@@ -496,12 +516,36 @@ useEffect(() => {
   await saveSingleEmployee(updatedEmployee);
 };
 
+const isOpenShiftNow = (shift) => {
+  // Si no tiene inicio o ya tiene fin → no está abierto
+  if (!shift.start || shift.end) return false;
+
+  const now = new Date();
+
+  const shiftDate = new Date(shift.year, shift.month, shift.day);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  // Solo permitimos turnos de hoy o ayer
+  const isToday =
+    shiftDate.toDateString() === today.toDateString();
+
+  const isYesterday =
+    shiftDate.toDateString() === yesterday.toDateString();
+
+  if (!isToday && !isYesterday) return false;
+
+  // Comprobar hora de inicio
+  const [h, m] = shift.start.split(":").map(Number);
+  const shiftStart = new Date(shift.year, shift.month, shift.day, h, m);
+
+  return now >= shiftStart;
+};
   const hasOpenShift =
-    !isAdmin &&
-    user &&
-    (user.schedule || []).some(
-      (shift) => isTodayShift(shift) && hasShiftStarted(shift) && !shift.end
-    );
+  !isAdmin &&
+  user &&
+  (user.schedule || []).some((shift) => isOpenShiftNow(shift));
 
   const addShift = async () => {
   if (savingShift) return;
@@ -540,6 +584,10 @@ useEffect(() => {
     });
 
     await saveEmployees(updated);
+    if (shouldBackup()) {
+  await hacerBackup(updated);
+  localStorage.setItem("lastBackup", Date.now());
+}
     closeModal();
     showToast("Turno guardado ✔");
   } finally {
@@ -566,6 +614,10 @@ useEffect(() => {
     });
 
     await saveEmployees(updated);
+    if (shouldBackup()) {
+  await hacerBackup(updated);
+  localStorage.setItem("lastBackup", Date.now());
+}
     closeModal();
     showToast("Turno borrado 🗑️");
   } finally {
@@ -580,9 +632,9 @@ useEffect(() => {
       if (emp.id !== user.id) return emp;
 
       const newSchedule = [...(emp.schedule || [])];
-      const openShiftIndex = newSchedule.findIndex(
-        (shift) => isTodayShift(shift) && hasShiftStarted(shift) && !shift.end
-      );
+      const openShiftIndex = newSchedule.findIndex((shift) =>
+  isOpenShiftNow(shift)
+);
 
       if (openShiftIndex !== -1) {
         newSchedule[openShiftIndex] = {
@@ -595,6 +647,10 @@ useEffect(() => {
     });
 
     await saveEmployees(updated);
+    if (shouldBackup()) {
+  await hacerBackup(updated);
+  localStorage.setItem("lastBackup", Date.now());
+}
   };
 
   function getWeekKey(startDate, endDate) {
@@ -770,6 +826,10 @@ const restoreLatestBackup = async () => {
 
   const updated = employees.filter((emp) => emp.id !== employeeId);
   await saveEmployees(updated);
+  if (shouldBackup()) {
+  await hacerBackup(updated);
+  localStorage.setItem("lastBackup", Date.now());
+}
   await deleteDoc(doc(db, "employees", String(employeeId)));
 
 
@@ -805,7 +865,6 @@ const restoreLatestBackup = async () => {
             <div className="calendar-header">
               <div>
                 <h2 className="section-title">Calendario del equipo</h2>
-                <span className="calendar-note">Vista general del bar</span>
               </div>
             </div>
 

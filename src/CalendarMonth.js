@@ -79,10 +79,14 @@ function CalendarMonth({ employees = [], user = null, onSelectEmployee }) {
           }))
       )
       .sort((a, b) => {
-        const aStart = a.shift?.start || "99:99";
-        const bStart = b.shift?.start || "99:99";
-        return aStart.localeCompare(bStart);
-      });
+  const toMinutes = (time) => {
+    if (!time) return 9999;
+    const [h, m] = String(time).split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  return toMinutes(a.shift?.start) - toMinutes(b.shift?.start);
+});
   };
 
   const syncHeaderScroll = () => {
@@ -147,16 +151,9 @@ function CalendarMonth({ employees = [], user = null, onSelectEmployee }) {
                 <div
                   key={index}
                   className={`calendar-cell ${
-                    !dayObj.isCurrentMonth ? "calendar-other-month" : ""
-                  }`}
-                  style={
-                    isToday
-                      ? {
-                          border: "2px solid #f59e0b",
-                          boxShadow: "0 0 0 3px rgba(245, 158, 11, 0.12)",
-                        }
-                      : undefined
-                  }
+  !dayObj.isCurrentMonth ? "calendar-other-month" : ""
+} ${isToday ? "calendar-today" : ""}`}
+            
                   onClick={() => {
                     onSelectEmployee?.(null, {
                       day: dayObj.day,
