@@ -853,10 +853,6 @@ select.input {
     min-height: 104px;
   }
 
-  .calendar-header-inner,
-.calendar-body-inner {
-  min-width: 860px;
-}
 
 .calendar-weekdays,
 .calendar-grid {
@@ -867,7 +863,11 @@ select.input {
   min-height: 88px;
 }
 .calendar-fixed-header {
+  position: sticky;
   top: 72px;
+  z-index: 40;
+  background: #fff;
+  padding-bottom: 8px;
 }
 }
 
@@ -929,4 +929,12 @@ select.input {
   z-index: 40;
   background: #fff;
   padding-bottom: 8px;
+}
+
+html, body {
+  overscroll-behavior: none;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
 }
