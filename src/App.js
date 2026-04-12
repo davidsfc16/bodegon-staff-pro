@@ -517,30 +517,26 @@ useEffect(() => {
 };
 
 const isOpenShiftNow = (shift) => {
-  // Si no tiene inicio o ya tiene fin → no está abierto
-  if (!shift.start || shift.end) return false;
+  if (!shift || !shift.start || shift.end) return false;
 
   const now = new Date();
 
-  const shiftDate = new Date(shift.year, shift.month, shift.day);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  // Solo permitimos turnos de hoy o ayer
-  const isToday =
-    shiftDate.toDateString() === today.toDateString();
+  const shiftDate = new Date(
+    Number(shift.year),
+    Number(shift.month),
+    Number(shift.day)
+  );
 
-  const isYesterday =
-    shiftDate.toDateString() === yesterday.toDateString();
+  const sameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
 
-  if (!isToday && !isYesterday) return false;
-
-  // Comprobar hora de inicio
-  const [h, m] = shift.start.split(":").map(Number);
-  const shiftStart = new Date(shift.year, shift.month, shift.day, h, m);
-
-  return now >= shiftStart;
+  return sameDay(shiftDate, today) || sameDay(shiftDate, yesterday);
 };
   const hasOpenShift =
   !isAdmin &&
@@ -626,27 +622,27 @@ const isOpenShiftNow = (shift) => {
 };
 
   const finishShift = async () => {
-    if (!user) return;
+  if (!user) return;
 
-    const updated = employees.map((emp) => {
-      if (emp.id !== user.id) return emp;
+  const updated = employees.map((emp) => {
+    if (emp.id !== user.id) return emp;
 
-      const newSchedule = [...(emp.schedule || [])];
-      const openShiftIndex = newSchedule.findIndex((shift) =>
-  isOpenShiftNow(shift)
-);
+    const newSchedule = [...(emp.schedule || [])];
+    const openShiftIndex = newSchedule.findIndex((shift) =>
+      isOpenShiftNow(shift)
+    );
 
-      if (openShiftIndex !== -1) {
-        newSchedule[openShiftIndex] = {
-          ...newSchedule[openShiftIndex],
-          end: new Date().toTimeString().slice(0, 5),
-        };
-      }
+    if (openShiftIndex !== -1) {
+      newSchedule[openShiftIndex] = {
+        ...newSchedule[openShiftIndex],
+        end: new Date().toTimeString().slice(0, 5),
+      };
+    }
 
-      return { ...emp, schedule: newSchedule };
-    });
+    return { ...emp, schedule: newSchedule };
+  });
 
-    await saveEmployees(updated);
+  await saveEmployees(updated);
     if (shouldBackup()) {
   await hacerBackup(updated);
   localStorage.setItem("lastBackup", Date.now());
