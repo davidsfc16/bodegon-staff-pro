@@ -120,6 +120,27 @@ const shouldBackup = () => {
   const diff = Date.now() - Number(last);
   return diff > 6 * 60 * 60 * 1000; // 6 horas
 };
+
+const getStartOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+
+  const diff = day === 0 ? -6 : 1 - day; // lunes
+  d.setDate(d.getDate() + diff);
+
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getEndOfWeek = (date) => {
+  const start = getStartOfWeek(date);
+  const end = new Date(start);
+
+  end.setDate(start.getDate() + 6); // domingo
+  end.setHours(23, 59, 59, 999);
+
+  return end;
+};
 const getWeeksWithShifts = useCallback(() => {
   const weekMap = new Map();
 
@@ -162,7 +183,7 @@ const getWeeksWithShifts = useCallback(() => {
   });
 
   return Array.from(weekMap.values()).sort((a, b) => b.weekStart - a.weekStart);
-}, [employees, getStartOfWeek, getEndOfWeek]);
+}, [employees]);
 
 const hacerBackup = async (employees) => {
   try {
@@ -392,7 +413,7 @@ const setupAdminPushListeners = () => {
     alert("No se pudo verificar la huella");
   }
 };
-
+// eslint-disable-next-line react-hooks/exhaustive-deps
 useEffect(() => {
   if (showDeleteWeekModal) {
     const weeks = getWeeksWithShifts();
@@ -787,26 +808,7 @@ if (shouldBackup()) {
 showToast("Semana borrada 🗑️");
 };
 
-const getStartOfWeek = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
 
-  const diff = day === 0 ? -6 : 1 - day; // lunes
-  d.setDate(d.getDate() + diff);
-
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
-const getEndOfWeek = (date) => {
-  const start = getStartOfWeek(date);
-  const end = new Date(start);
-
-  end.setDate(start.getDate() + 6); // domingo
-  end.setHours(23, 59, 59, 999);
-
-  return end;
-};
 
 const getWeekRangeFromStart = (weekStart) => {
   const start = new Date(weekStart);
