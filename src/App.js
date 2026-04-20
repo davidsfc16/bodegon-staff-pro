@@ -183,7 +183,7 @@ const getWeeksWithShifts = useCallback(() => {
   });
 
   return Array.from(weekMap.values()).sort((a, b) => b.weekStart - a.weekStart);
-}, [employees]);
+}, [employees, getStartOfWeek, getEndOfWeek]);
 
 const hacerBackup = async (employees) => {
   try {
