@@ -61,8 +61,15 @@ function App() {
   const createShiftId = () => {
   return `shift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 };
-
+const [finishingShift, setFinishingShift] = useState(false);
+const [showWeekActionModal, setShowWeekActionModal] = useState(false);
+const [selectedWeekActionStart, setSelectedWeekActionStart] = useState(null);
+const [swapMode, setSwapMode] = useState(false);
+const [firstSwap, setFirstSwap] = useState(null);
 const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null);
+const [showSwapModal, setShowSwapModal] = useState(false);
+const [swapCandidates, setSwapCandidates] = useState([]);
+const [baseSwapShift, setBaseSwapShift] = useState(null);
 
   const formatHours = (hoursDecimal) => {
     const totalMinutes = Math.round(hoursDecimal * 60);
@@ -70,6 +77,8 @@ const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null)
     const m = totalMinutes % 60;
     return `${h}h ${m.toString().padStart(2, "0")}m`;
   };
+  const [showDeleteWeekModal, setShowDeleteWeekModal] = useState(false);
+const [selectedWeekToDelete, setSelectedWeekToDelete] = useState("");
 
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -197,6 +206,58 @@ const checkForUpdates = useCallback(async () => {
       setUser(refreshedUser || null);
     }
   };
+  const handleSwapFromList = async (targetShift) => {
+  if (!baseSwapShift || !targetShift) return;
+
+  const ok = window.confirm("¿Intercambiar estos turnos?");
+  if (!ok) return;
+
+  let shiftA = baseSwapShift;
+  let shiftB = targetShift;
+
+  const updated = employees.map((emp) => {
+    const newSchedule = (emp.schedule || []).map((shift) => {
+      if (emp.id === shiftA.employeeId && shift.id === shiftA.id) {
+        return {
+          ...shift,
+          day: shiftB.day,
+          month: shiftB.month,
+          year: shiftB.year,
+          start: shiftB.start,
+          end: shiftB.end,
+        };
+      }
+
+      if (emp.id === shiftB.employeeId && shift.id === shiftB.id) {
+        return {
+          ...shift,
+          day: shiftA.day,
+          month: shiftA.month,
+          year: shiftA.year,
+          start: shiftA.start,
+          end: shiftA.end,
+        };
+      }
+
+      return shift;
+    });
+
+    return { ...emp, schedule: newSchedule };
+  });
+
+  setShowSwapModal(false);
+  setSwapCandidates([]);
+  setBaseSwapShift(null);
+
+  await saveEmployees(updated);
+
+  if (shouldBackup()) {
+    await hacerBackup(updated);
+    localStorage.setItem("lastBackup", Date.now());
+  }
+
+  showToast("Turnos intercambiados 🔄");
+};
 
   const registerAdminPush = async () => {
   try {
@@ -293,6 +354,14 @@ const setupAdminPushListeners = () => {
   }
 };
 
+useEffect(() => {
+  if (showDeleteWeekModal) {
+    const weeks = getWeeksWithShifts();
+    if (weeks.length > 0) {
+      setSelectedWeekToDelete(weeks[0].key);
+    }
+  }
+}, [showDeleteWeekModal, employees]);
 
 useEffect(() => {
   setupAdminPushListeners();
@@ -362,7 +431,6 @@ useEffect(() => {
           if (savedAdminSession.value) {
             setIsAdmin(true);
             setUser(null);
-            setActiveTab("calendar");
           } else if (savedEmployeeSession.value) {
             const parsed = JSON.parse(savedEmployeeSession.value);
             const found = data.find((emp) => emp.id === parsed.employeeId);
@@ -370,7 +438,6 @@ useEffect(() => {
             if (found) {
               setUser(found);
               setIsAdmin(false);
-              setActiveTab("calendar");
             } else {
               setUser(null);
             }
@@ -479,7 +546,7 @@ useEffect(() => {
     await Preferences.remove({ key: "employeeSession" });
     await Preferences.remove({ key: "adminSession" });
   };
-  
+
   const updateEmployeeColor = async (color) => {
   if (!selectedSettingsEmployeeId) return;
 
@@ -516,7 +583,26 @@ const isOpenShiftNow = (shift) => {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
 
-  return sameDay(shiftDate, today) || sameDay(shiftDate, yesterday);
+  const toMinutes = (time) => {
+  if (!time) return 0;
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const nowMinutes = now.getHours() * 60 + now.getMinutes();
+const startMinutes = toMinutes(shift.start);
+
+// 👉 si es hoy, solo vale si ya ha empezado
+if (sameDay(shiftDate, today) && nowMinutes >= startMinutes) {
+  return true;
+}
+
+// 👉 si es de ayer, sigue abierto
+if (sameDay(shiftDate, yesterday)) {
+  return true;
+}
+
+return false;
 };
   const hasOpenShift =
   !isAdmin &&
@@ -601,34 +687,409 @@ const isOpenShiftNow = (shift) => {
   }
 };
 
-  const finishShift = async () => {
-  if (!user) return;
+const getWeeksWithShifts = () => {
+  const weekMap = new Map();
 
-  const updated = employees.map((emp) => {
-    if (emp.id !== user.id) return emp;
+  employees.forEach((emp) => {
+    (emp.schedule || []).forEach((shift) => {
+      if (
+        shift.day === undefined ||
+        shift.month === undefined ||
+        shift.year === undefined
+      ) {
+        return;
+      }
 
-    const newSchedule = [...(emp.schedule || [])];
-    const openShiftIndex = newSchedule.findIndex((shift) =>
-      isOpenShiftNow(shift)
-    );
+      const shiftDate = new Date(
+        Number(shift.year),
+        Number(shift.month),
+        Number(shift.day)
+      );
 
-    if (openShiftIndex !== -1) {
-      newSchedule[openShiftIndex] = {
-        ...newSchedule[openShiftIndex],
-        end: new Date().toTimeString().slice(0, 5),
-      };
-    }
+      const weekStart = getStartOfWeek(shiftDate);
+      const weekEnd = getEndOfWeek(shiftDate);
 
-    return { ...emp, schedule: newSchedule };
+      const toLocalDateKey = (d) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const key = `${toLocalDateKey(weekStart)}_${toLocalDateKey(weekEnd)}`;
+
+      if (!weekMap.has(key)) {
+        weekMap.set(key, {
+          key,
+          weekStart,
+          weekEnd,
+        });
+      }
+    });
   });
 
-  await saveEmployees(updated);
-    if (shouldBackup()) {
+  return Array.from(weekMap.values()).sort((a, b) => b.weekStart - a.weekStart);
+};
+
+const deleteSelectedWeek = async () => {
+  if (!isAdmin) return;
+  if (!selectedWeekToDelete) {
+    showToast("Selecciona una semana");
+    return;
+  }
+
+  const [startStr, endStr] = selectedWeekToDelete.split("_");
+
+const [startYear, startMonth, startDay] = startStr.split("-").map(Number);
+const [endYear, endMonth, endDay] = endStr.split("-").map(Number);
+
+const weekStart = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+const weekEnd = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+
+  const formatDate = (d) =>
+    d.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+  const ok = window.confirm(
+    `¿Seguro que quieres borrar la semana ${formatDate(
+      weekStart
+    )} - ${formatDate(weekEnd)}?`
+  );
+
+  if (!ok) return;
+
+  const updated = employees.map((emp) => {
+    const filteredSchedule = (emp.schedule || []).filter((shift) => {
+      const shiftDate = new Date(
+        Number(shift.year),
+        Number(shift.month),
+        Number(shift.day)
+      );
+
+      return shiftDate < weekStart || shiftDate > weekEnd;
+    });
+
+    return {
+      ...emp,
+      schedule: filteredSchedule,
+    };
+  });
+
+  setShowDeleteWeekModal(false);
+setSelectedWeekToDelete("");
+
+await saveEmployees(updated);
+
+if (shouldBackup()) {
   await hacerBackup(updated);
   localStorage.setItem("lastBackup", Date.now());
 }
-  };
 
+showToast("Semana borrada 🗑️");
+};
+
+const getStartOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+
+  const diff = day === 0 ? -6 : 1 - day; // lunes
+  d.setDate(d.getDate() + diff);
+
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getEndOfWeek = (date) => {
+  const start = getStartOfWeek(date);
+  const end = new Date(start);
+
+  end.setDate(start.getDate() + 6); // domingo
+  end.setHours(23, 59, 59, 999);
+
+  return end;
+};
+
+const getWeekRangeFromStart = (weekStart) => {
+  const start = new Date(weekStart);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
+};
+
+const copySpecificWeekToNext = async () => {
+  if (!isAdmin || !selectedWeekActionStart) return;
+
+  const { start: sourceWeekStart, end: sourceWeekEnd } =
+    getWeekRangeFromStart(selectedWeekActionStart);
+
+  const targetWeekStart = new Date(sourceWeekStart);
+  targetWeekStart.setDate(targetWeekStart.getDate() + 7);
+
+  const targetWeekEnd = new Date(sourceWeekEnd);
+  targetWeekEnd.setDate(targetWeekEnd.getDate() + 7);
+
+  const targetHasShifts = employees.some((emp) =>
+    (emp.schedule || []).some((shift) => {
+      const shiftDate = new Date(shift.year, shift.month, shift.day);
+      return shiftDate >= targetWeekStart && shiftDate <= targetWeekEnd;
+    })
+  );
+
+  if (targetHasShifts) {
+    showToast("La semana siguiente ya tiene turnos");
+    return;
+  }
+
+  const updated = employees.map((emp) => {
+    const newSchedule = [...(emp.schedule || [])];
+
+    const sourceShifts = (emp.schedule || []).filter((shift) => {
+      const shiftDate = new Date(shift.year, shift.month, shift.day);
+      return shiftDate >= sourceWeekStart && shiftDate <= sourceWeekEnd;
+    });
+
+    sourceShifts.forEach((shift) => {
+      const originalDate = new Date(shift.year, shift.month, shift.day);
+      const copiedDate = new Date(originalDate);
+      copiedDate.setDate(copiedDate.getDate() + 7);
+
+      newSchedule.push({
+        ...shift,
+        id: createShiftId(),
+        day: copiedDate.getDate(),
+        month: copiedDate.getMonth(),
+        year: copiedDate.getFullYear(),
+      });
+    });
+
+    return {
+      ...emp,
+      schedule: newSchedule,
+    };
+  });
+
+  setShowWeekActionModal(false);
+  setSelectedWeekActionStart(null);
+
+  await saveEmployees(updated);
+
+  if (shouldBackup()) {
+    await hacerBackup(updated);
+    localStorage.setItem("lastBackup", Date.now());
+  }
+
+  showToast("Semana copiada ✔");
+};
+
+const deleteWeekFromMonday = async () => {
+  if (!isAdmin || !selectedWeekActionStart) return;
+
+  const { start: weekStart, end: weekEnd } =
+    getWeekRangeFromStart(selectedWeekActionStart);
+
+  const formatDate = (d) =>
+    d.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+  const ok = window.confirm(
+    `¿Seguro que quieres borrar la semana ${formatDate(
+      weekStart
+    )} - ${formatDate(weekEnd)}?`
+  );
+
+  if (!ok) return;
+
+  const updated = employees.map((emp) => {
+    const filteredSchedule = (emp.schedule || []).filter((shift) => {
+      const shiftDate = new Date(
+        Number(shift.year),
+        Number(shift.month),
+        Number(shift.day)
+      );
+
+      return shiftDate < weekStart || shiftDate > weekEnd;
+    });
+
+    return {
+      ...emp,
+      schedule: filteredSchedule,
+    };
+  });
+
+  setShowWeekActionModal(false);
+  setSelectedWeekActionStart(null);
+
+  await saveEmployees(updated);
+
+  if (shouldBackup()) {
+    await hacerBackup(updated);
+    localStorage.setItem("lastBackup", Date.now());
+  }
+
+  showToast("Semana borrada 🗑️");
+};
+
+const copyLatestWeekToNext = async () => {
+  if (!isAdmin) return;
+  const allShifts = employees.flatMap((emp) =>
+    (emp.schedule || []).map((shift) => ({
+      employeeId: emp.id,
+      shift,
+    }))
+  );
+
+  if (allShifts.length === 0) {
+    showToast("No hay semanas para copiar");
+    return;
+  }
+
+  // Buscar la fecha más reciente que tenga turnos
+  let latestDate = null;
+
+  allShifts.forEach(({ shift }) => {
+    if (
+      shift.day === undefined ||
+      shift.month === undefined ||
+      shift.year === undefined
+    ) {
+      return;
+    }
+
+    const d = new Date(shift.year, shift.month, shift.day);
+
+    if (!latestDate || d > latestDate) {
+      latestDate = d;
+    }
+  });
+
+  if (!latestDate) {
+    showToast("No hay semanas para copiar");
+    return;
+  }
+
+  const sourceWeekStart = getStartOfWeek(latestDate);
+  const sourceWeekEnd = getEndOfWeek(latestDate);
+
+  const targetWeekStart = new Date(sourceWeekStart);
+  targetWeekStart.setDate(targetWeekStart.getDate() + 7);
+
+  const targetWeekEnd = new Date(sourceWeekEnd);
+  targetWeekEnd.setDate(targetWeekEnd.getDate() + 7);
+
+  const formatDate = (d) =>
+    d.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+  // Comprobar si la semana siguiente ya tiene turnos
+  const targetHasShifts = employees.some((emp) =>
+    (emp.schedule || []).some((shift) => {
+      const shiftDate = new Date(shift.year, shift.month, shift.day);
+      return shiftDate >= targetWeekStart && shiftDate <= targetWeekEnd;
+    })
+  );
+
+  if (targetHasShifts) {
+    showToast("La semana siguiente ya tiene turnos");
+    return;
+  }
+
+  const ok = window.confirm(
+    `¿Copiar la semana ${formatDate(sourceWeekStart)} - ${formatDate(
+      sourceWeekEnd
+    )} a la semana ${formatDate(targetWeekStart)} - ${formatDate(
+      targetWeekEnd
+    )}?`
+  );
+
+  if (!ok) return;
+
+  const updated = employees.map((emp) => {
+    const newSchedule = [...(emp.schedule || [])];
+
+    const sourceShifts = (emp.schedule || []).filter((shift) => {
+      const shiftDate = new Date(shift.year, shift.month, shift.day);
+      return shiftDate >= sourceWeekStart && shiftDate <= sourceWeekEnd;
+    });
+
+    sourceShifts.forEach((shift) => {
+      const originalDate = new Date(shift.year, shift.month, shift.day);
+      const copiedDate = new Date(originalDate);
+      copiedDate.setDate(copiedDate.getDate() + 7);
+
+      newSchedule.push({
+        ...shift,
+        id: createShiftId(),
+        day: copiedDate.getDate(),
+        month: copiedDate.getMonth(),
+        year: copiedDate.getFullYear(),
+      });
+    });
+
+    return {
+      ...emp,
+      schedule: newSchedule,
+    };
+  });
+
+  await saveEmployees(updated);
+
+  if (shouldBackup()) {
+    await hacerBackup(updated);
+    localStorage.setItem("lastBackup", Date.now());
+  }
+
+  showToast("Semana copiada ✔");
+};
+
+  const finishShift = async () => {
+  if (!user || finishingShift) return;
+
+  setFinishingShift(true);
+
+  try {
+    const updated = employees.map((emp) => {
+      if (emp.id !== user.id) return emp;
+
+      const newSchedule = [...(emp.schedule || [])];
+      const openShiftIndex = newSchedule.findIndex((shift) =>
+        isOpenShiftNow(shift)
+      );
+
+      if (openShiftIndex !== -1) {
+        newSchedule[openShiftIndex] = {
+          ...newSchedule[openShiftIndex],
+          end: new Date().toTimeString().slice(0, 5),
+        };
+      }
+
+      return { ...emp, schedule: newSchedule };
+    });
+
+    await saveEmployees(updated);
+
+    if (shouldBackup()) {
+      await hacerBackup(updated);
+      localStorage.setItem("lastBackup", Date.now());
+    }
+
+    showToast("Turno terminado ✔");
+  } finally {
+    setFinishingShift(false);
+  }
+};
   function getWeekKey(startDate, endDate) {
     const start = startDate.toISOString().slice(0, 10);
     const end = endDate.toISOString().slice(0, 10);
@@ -670,6 +1131,102 @@ const isOpenShiftNow = (shift) => {
       { hours: 0, pay: 0, active: 0 }
     );
   }, [employees, weekStart, weekEnd]);
+
+  const handleSwapShifts = async (a, b) => {
+  if (!a || !b) return;
+
+  if (a.shiftId === b.shiftId && a.employeeId === b.employeeId) {
+    showToast("Selecciona otro turno");
+    return;
+  }
+
+  const ok = window.confirm("¿Intercambiar estos turnos?");
+  if (!ok) return;
+
+  const updated = employees.map((emp) => {
+    let newSchedule = [...(emp.schedule || [])];
+
+    newSchedule = newSchedule.map((shift) => {
+      // turno A
+      if (emp.id === a.employeeId && shift.id === a.shiftId) {
+        return {
+          ...shift,
+          swappedWith: b,
+        };
+      }
+
+      // turno B
+      if (emp.id === b.employeeId && shift.id === b.shiftId) {
+        return {
+          ...shift,
+          swappedWith: a,
+        };
+      }
+
+      return shift;
+    });
+
+    return { ...emp, schedule: newSchedule };
+  });
+
+  // ahora intercambiamos realmente
+  let shiftA, shiftB;
+
+  employees.forEach((emp) => {
+    (emp.schedule || []).forEach((shift) => {
+      if (emp.id === a.employeeId && shift.id === a.shiftId) {
+        shiftA = { ...shift };
+      }
+      if (emp.id === b.employeeId && shift.id === b.shiftId) {
+        shiftB = { ...shift };
+      }
+    });
+  });
+
+  const final = updated.map((emp) => {
+    let newSchedule = [...(emp.schedule || [])];
+
+    newSchedule = newSchedule.map((shift) => {
+      if (emp.id === a.employeeId && shift.id === a.shiftId) {
+        return {
+          ...shift,
+          day: shiftB.day,
+          month: shiftB.month,
+          year: shiftB.year,
+          start: shiftB.start,
+          end: shiftB.end,
+        };
+      }
+
+      if (emp.id === b.employeeId && shift.id === b.shiftId) {
+        return {
+          ...shift,
+          day: shiftA.day,
+          month: shiftA.month,
+          year: shiftA.year,
+          start: shiftA.start,
+          end: shiftA.end,
+        };
+      }
+
+      return shift;
+    });
+
+    return { ...emp, schedule: newSchedule };
+  });
+
+  setSwapMode(false);
+  setFirstSwap(null);
+
+  await saveEmployees(final);
+
+  if (shouldBackup()) {
+    await hacerBackup(final);
+    localStorage.setItem("lastBackup", Date.now());
+  }
+
+  showToast("Turnos intercambiados 🔄");
+};
 
   const markWeekAsPaid = async (employeeId) => {
   const employee = employees.find((emp) => emp.id === employeeId);
@@ -837,45 +1394,170 @@ const restoreLatestBackup = async () => {
     if (activeTab === "calendar") {
       return (
         <>
+        {swapMode && (
+  <div className="update-banner">
+    Selecciona el turno con el que intercambiar
+  </div>
+)}
           <section className="card calendar-panel">
             <div className="calendar-header">
-              <div>
-                <h2 className="section-title">Calendario del equipo</h2>
-              </div>
-            </div>
+              {isAdmin && (
+  <div className="row" style={{ marginBottom: "8px" }}>
+  
+</div>
+              )}
+
+  <div>
+  
+  </div>
+</div>
 
             <CalendarMonth
-              employees={employees}
-              user={user}
-              onSelectEmployee={(e, shift, index) => {
-                if (!isAdmin) return;
+  employees={employees}
+  user={user}
+  isAdmin={isAdmin}
+  onWeekLongPress={(weekStart) => {
+    setSelectedWeekActionStart(weekStart);
+    setShowWeekActionModal(true);
+  }}
+  onSelectEmployee={(e, shift, index) => {
+    if (!isAdmin) return;
 
-                if (shift?.day && !e) {
-                  setCalendarFormDay(shift.day);
-                  setCalendarFormMonth(shift.month);
-                  setCalendarFormYear(shift.year);
-                  setCalendarEmployeeId("");
-                  setCalendarStart("");
-                  setCalendarEnd("");
-                  setEditingFromCalendar(null);
-                  return;
-                }
-
-                if (e && shift) {
-  setCalendarFormDay(shift.day);
-  setCalendarFormMonth(shift.month);
-  setCalendarFormYear(shift.year);
-  setCalendarEmployeeId(String(e.id));
-  setCalendarStart(shift.start || "");
-  setCalendarEnd(shift.end || "");
-  setEditingFromCalendar({
+    if (swapMode && firstSwap && e && shift) {
+  handleSwapShifts(firstSwap, {
     employeeId: e.id,
     shiftId: shift.id,
   });
+  return;
 }
-              }}
-            />
+
+    if (shift?.day && !e) {
+      setCalendarFormDay(shift.day);
+      setCalendarFormMonth(shift.month);
+      setCalendarFormYear(shift.year);
+      setCalendarEmployeeId("");
+      setCalendarStart("");
+      setCalendarEnd("");
+      setEditingFromCalendar(null);
+      return;
+    }
+
+    if (e && shift) {
+      setCalendarFormDay(shift.day);
+      setCalendarFormMonth(shift.month);
+      setCalendarFormYear(shift.year);
+      setCalendarEmployeeId(String(e.id));
+      setCalendarStart(shift.start || "");
+      setCalendarEnd(shift.end || "");
+      setEditingFromCalendar({
+        employeeId: e.id,
+        shiftId: shift.id,
+      });
+    }
+  }}
+/>
           </section>
+
+          {isAdmin && showDeleteWeekModal && (
+  <Modal>
+    <h3 className="calendar-modal-title">Borrar semana</h3>
+
+    <select
+      className="input"
+      value={selectedWeekToDelete}
+      onChange={(e) => setSelectedWeekToDelete(e.target.value)}
+    >
+      <option value="">Selecciona una semana</option>
+      {getWeeksWithShifts().map((week) => (
+        <option key={week.key} value={week.key}>
+          {week.weekStart.toLocaleDateString("es-ES")} -{" "}
+          {week.weekEnd.toLocaleDateString("es-ES")}
+        </option>
+      ))}
+    </select>
+
+    <div className="row">
+      <button className="danger-btn" onClick={deleteSelectedWeek}>
+        Borrar
+      </button>
+
+      <button
+        className="secondary-btn"
+        onClick={() => {
+          setShowDeleteWeekModal(false);
+          setSelectedWeekToDelete("");
+        }}
+      >
+        Cancelar
+      </button>
+    </div>
+  </Modal>
+)}
+
+{showSwapModal && (
+  <Modal>
+    <h3 className="calendar-modal-title">
+      ¿Con qué turno quieres intercambiar?
+    </h3>
+
+    <div style={{ marginTop: "10px" }}>
+      {swapCandidates.length === 0 && (
+        <div>No hay otros turnos ese día</div>
+      )}
+
+      {swapCandidates.map((s) => (
+        <button
+          key={s.id}
+          className="secondary-btn"
+          style={{ width: "100%", marginBottom: "8px" }}
+          onClick={() => handleSwapFromList(s)}
+        >
+          {s.employeeName} · {s.start}
+          {s.end ? ` - ${s.end}` : ""}
+        </button>
+      ))}
+    </div>
+
+    <button
+      className="secondary-btn"
+      style={{ marginTop: "10px", width: "100%" }}
+      onClick={() => {
+        setShowSwapModal(false);
+        setSwapCandidates([]);
+        setBaseSwapShift(null);
+      }}
+    >
+      Cancelar
+    </button>
+  </Modal>
+)}
+{isAdmin && showWeekActionModal && (
+  <Modal>
+    <h3 className="calendar-modal-title">Acciones de semana</h3>
+
+    <div className="row">
+      <button className="secondary-btn" onClick={copySpecificWeekToNext}>
+        Copiar semana
+      </button>
+
+      <button className="danger-btn" onClick={deleteWeekFromMonday}>
+        Borrar semana
+      </button>
+    </div>
+
+    <div className="row" style={{ marginTop: "10px" }}>
+      <button
+        className="secondary-btn"
+        onClick={() => {
+          setShowWeekActionModal(false);
+          setSelectedWeekActionStart(null);
+        }}
+      >
+        Cancelar
+      </button>
+    </div>
+  </Modal>
+)}
 
           {isAdmin && calendarFormDay !== null && (
             <Modal>
@@ -888,7 +1570,6 @@ const restoreLatestBackup = async () => {
                 className="input"
                 value={calendarEmployeeId}
                 onChange={(e) => setCalendarEmployeeId(e.target.value)}
-                disabled={!!editingFromCalendar}
               >
                 <option value="">Selecciona empleado</option>
                 {employees.map((emp) => (
@@ -929,14 +1610,59 @@ const restoreLatestBackup = async () => {
               </div>
 
               {editingFromCalendar && (
+                <>
+
                 <button
-  className="danger-btn"
+  className="secondary-btn"
   style={{ marginTop: "12px", width: "100%" }}
-  onClick={deleteShiftFromModal}
-  disabled={savingShift}
+  onClick={() => {
+    const { employeeId, shiftId } = editingFromCalendar;
+
+    let selectedShift = null;
+
+    employees.forEach((emp) => {
+      (emp.schedule || []).forEach((shift) => {
+        if (emp.id === employeeId && shift.id === shiftId) {
+          selectedShift = { ...shift, employeeId };
+        }
+      });
+    });
+
+    if (!selectedShift) return;
+
+    const candidates = [];
+
+    employees.forEach((emp) => {
+      (emp.schedule || []).forEach((shift) => {
+        const sameDay =
+          shift.day === selectedShift.day &&
+          shift.month === selectedShift.month &&
+          shift.year === selectedShift.year;
+
+        const notSame =
+          !(emp.id === employeeId && shift.id === shiftId);
+
+        if (sameDay && notSame) {
+          candidates.push({
+            ...shift,
+            employeeId: emp.id,
+            employeeName: emp.name,
+          });
+        }
+      });
+    });
+
+    setBaseSwapShift(selectedShift);
+    setSwapCandidates(candidates);
+    setShowSwapModal(true);
+
+    closeModal();
+  }}
 >
-  {savingShift ? "Borrando..." : "Borrar turno"}
+  Intercambiar turno
 </button>
+</>
+
               )}
             </Modal>
           )}
@@ -984,50 +1710,51 @@ const restoreLatestBackup = async () => {
               return (
                 <div key={emp.id}>
                   <div
-                    className="shift-item"
-                    onClick={() =>
-                      setSelectedTeamEmployeeId((prev) =>
-                        prev === emp.id ? null : emp.id
-                      )
-                    }
-                    style={{
-                      cursor: "pointer",
-                      border: isSelected
-                        ? `2px solid ${emp.color}`
-                        : "1px solid #e5e7eb",
-                      background: isSelected ? "#fff7ed" : "#f9fafb",
-                      boxShadow: isSelected
-                        ? "0 0 0 3px rgba(245, 158, 11, 0.12)"
-                        : "none",
-                    }}
-                  >
-                    <div className="shift-item-name">
-                      <span
-                        className="employee-dot"
-                        style={{ backgroundColor: emp.color }}
-                      />
-                      <strong>{emp.name}</strong>
-                    </div>
+  className="shift-item team-item-compact"
+  onClick={() =>
+    setSelectedTeamEmployeeId((prev) =>
+      prev === emp.id ? null : emp.id
+    )
+  }
+  style={{
+    cursor: "pointer",
+    border: isSelected
+      ? `2px solid ${emp.color}`
+      : "1px solid #e5e7eb",
+    background: isSelected ? "#fff7ed" : "#f9fafb",
+    boxShadow: isSelected
+      ? "0 0 0 3px rgba(245, 158, 11, 0.12)"
+      : "none",
+  }}
+>
+  <div className="team-item-status-wrap">
+    <div
+      className="status-pill team-item-status"
+      style={{
+        color: isPaid ? "#16a34a" : "#f59e0b",
+        background: isPaid ? "#dcfce7" : "#fef3c7",
+      }}
+    >
+      {isPaid ? "Pagado" : "Pendiente"}
+    </div>
+  </div>
 
-                    <div>
-                      {formatHours(stats.normalHours)} |{" "}
-                      {formatHours(stats.extraHours)}
-                    </div>
+  <div className="shift-item-name">
+    <span
+      className="employee-dot"
+      style={{ backgroundColor: emp.color }}
+    />
+    <strong>{emp.name}</strong>
+  </div>
 
-                    <div className="shift-item-pay">
-                      {stats.totalPay.toFixed(2)} €
-                    </div>
+  <div>
+    {formatHours(stats.normalHours)} | {formatHours(stats.extraHours)}
+  </div>
 
-                    <div
-                      className="status-pill"
-                      style={{
-                        color: isPaid ? "#16a34a" : "#f59e0b",
-                        background: isPaid ? "#dcfce7" : "#fef3c7",
-                      }}
-                    >
-                      {isPaid ? "Pagado" : "Pendiente"}
-                    </div>
-                  </div>
+  <div className="shift-item-pay">
+    {stats.totalPay.toFixed(2)} €
+  </div>
+</div>
 
                   {isSelected && (
                     <div className="card inner-card" style={{ marginTop: "10px" }}>
@@ -1376,9 +2103,13 @@ const restoreLatestBackup = async () => {
           ) : (
             <>
               {hasOpenShift ? (
-                <button onClick={finishShift} className="primary-btn">
-                  Terminar turno
-                </button>
+                <button
+  onClick={finishShift}
+  className="primary-btn"
+  disabled={finishingShift}
+>
+  {finishingShift ? "Terminando turno..." : "Terminar turno"}
+</button>
               ) : (
                 <div className="empty-box">
                   No tienes ningún turno activo ahora mismo.
