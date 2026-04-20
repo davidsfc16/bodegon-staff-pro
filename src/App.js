@@ -33,8 +33,6 @@ import { db } from "./firebase";
 import CalendarMonth from "./CalendarMonth";
 import {
   calculateWeeklyHours,
-  getEndOfWeek,
-  getStartOfWeek,
 } from "./Schedule";
 import logo from "./assets/logo.png";
 import "./App.css";
@@ -361,7 +359,7 @@ useEffect(() => {
       setSelectedWeekToDelete(weeks[0].key);
     }
   }
-}, [showDeleteWeekModal, employees]);
+}, [showDeleteWeekModal, employees, getWeeksWithShifts]);
 
 useEffect(() => {
   setupAdminPushListeners();
