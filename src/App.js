@@ -62,8 +62,6 @@ function App() {
 const [finishingShift, setFinishingShift] = useState(false);
 const [showWeekActionModal, setShowWeekActionModal] = useState(false);
 const [selectedWeekActionStart, setSelectedWeekActionStart] = useState(null);
-const [swapMode, setSwapMode] = useState(false);
-const [firstSwap, setFirstSwap] = useState(null);
 const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null);
 const [showSwapModal, setShowSwapModal] = useState(false);
 const [swapCandidates, setSwapCandidates] = useState([]);
@@ -122,6 +120,49 @@ const shouldBackup = () => {
   const diff = Date.now() - Number(last);
   return diff > 6 * 60 * 60 * 1000; // 6 horas
 };
+const getWeeksWithShifts = useCallback(() => {
+  const weekMap = new Map();
+
+  const toLocalDateKey = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  employees.forEach((emp) => {
+    (emp.schedule || []).forEach((shift) => {
+      if (
+        shift.day === undefined ||
+        shift.month === undefined ||
+        shift.year === undefined
+      ) {
+        return;
+      }
+
+      const shiftDate = new Date(
+        Number(shift.year),
+        Number(shift.month),
+        Number(shift.day)
+      );
+
+      const weekStart = getStartOfWeek(shiftDate);
+      const weekEnd = getEndOfWeek(shiftDate);
+
+      const key = `${toLocalDateKey(weekStart)}_${toLocalDateKey(weekEnd)}`;
+
+      if (!weekMap.has(key)) {
+        weekMap.set(key, {
+          key,
+          weekStart,
+          weekEnd,
+        });
+      }
+    });
+  });
+
+  return Array.from(weekMap.values()).sort((a, b) => b.weekStart - a.weekStart);
+}, [employees]);
 
 const hacerBackup = async (employees) => {
   try {
@@ -359,8 +400,7 @@ useEffect(() => {
       setSelectedWeekToDelete(weeks[0].key);
     }
   }
-}, [showDeleteWeekModal, employees, getWeeksWithShifts]);
-
+}, [showDeleteWeekModal, getWeeksWithShifts]);
 useEffect(() => {
   setupAdminPushListeners();
 }, []);
@@ -685,49 +725,7 @@ return false;
   }
 };
 
-const getWeeksWithShifts = () => {
-  const weekMap = new Map();
 
-  employees.forEach((emp) => {
-    (emp.schedule || []).forEach((shift) => {
-      if (
-        shift.day === undefined ||
-        shift.month === undefined ||
-        shift.year === undefined
-      ) {
-        return;
-      }
-
-      const shiftDate = new Date(
-        Number(shift.year),
-        Number(shift.month),
-        Number(shift.day)
-      );
-
-      const weekStart = getStartOfWeek(shiftDate);
-      const weekEnd = getEndOfWeek(shiftDate);
-
-      const toLocalDateKey = (d) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const key = `${toLocalDateKey(weekStart)}_${toLocalDateKey(weekEnd)}`;
-
-      if (!weekMap.has(key)) {
-        weekMap.set(key, {
-          key,
-          weekStart,
-          weekEnd,
-        });
-      }
-    });
-  });
-
-  return Array.from(weekMap.values()).sort((a, b) => b.weekStart - a.weekStart);
-};
 
 const deleteSelectedWeek = async () => {
   if (!isAdmin) return;
@@ -937,120 +935,7 @@ const deleteWeekFromMonday = async () => {
   showToast("Semana borrada 🗑️");
 };
 
-const copyLatestWeekToNext = async () => {
-  if (!isAdmin) return;
-  const allShifts = employees.flatMap((emp) =>
-    (emp.schedule || []).map((shift) => ({
-      employeeId: emp.id,
-      shift,
-    }))
-  );
 
-  if (allShifts.length === 0) {
-    showToast("No hay semanas para copiar");
-    return;
-  }
-
-  // Buscar la fecha más reciente que tenga turnos
-  let latestDate = null;
-
-  allShifts.forEach(({ shift }) => {
-    if (
-      shift.day === undefined ||
-      shift.month === undefined ||
-      shift.year === undefined
-    ) {
-      return;
-    }
-
-    const d = new Date(shift.year, shift.month, shift.day);
-
-    if (!latestDate || d > latestDate) {
-      latestDate = d;
-    }
-  });
-
-  if (!latestDate) {
-    showToast("No hay semanas para copiar");
-    return;
-  }
-
-  const sourceWeekStart = getStartOfWeek(latestDate);
-  const sourceWeekEnd = getEndOfWeek(latestDate);
-
-  const targetWeekStart = new Date(sourceWeekStart);
-  targetWeekStart.setDate(targetWeekStart.getDate() + 7);
-
-  const targetWeekEnd = new Date(sourceWeekEnd);
-  targetWeekEnd.setDate(targetWeekEnd.getDate() + 7);
-
-  const formatDate = (d) =>
-    d.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-
-  // Comprobar si la semana siguiente ya tiene turnos
-  const targetHasShifts = employees.some((emp) =>
-    (emp.schedule || []).some((shift) => {
-      const shiftDate = new Date(shift.year, shift.month, shift.day);
-      return shiftDate >= targetWeekStart && shiftDate <= targetWeekEnd;
-    })
-  );
-
-  if (targetHasShifts) {
-    showToast("La semana siguiente ya tiene turnos");
-    return;
-  }
-
-  const ok = window.confirm(
-    `¿Copiar la semana ${formatDate(sourceWeekStart)} - ${formatDate(
-      sourceWeekEnd
-    )} a la semana ${formatDate(targetWeekStart)} - ${formatDate(
-      targetWeekEnd
-    )}?`
-  );
-
-  if (!ok) return;
-
-  const updated = employees.map((emp) => {
-    const newSchedule = [...(emp.schedule || [])];
-
-    const sourceShifts = (emp.schedule || []).filter((shift) => {
-      const shiftDate = new Date(shift.year, shift.month, shift.day);
-      return shiftDate >= sourceWeekStart && shiftDate <= sourceWeekEnd;
-    });
-
-    sourceShifts.forEach((shift) => {
-      const originalDate = new Date(shift.year, shift.month, shift.day);
-      const copiedDate = new Date(originalDate);
-      copiedDate.setDate(copiedDate.getDate() + 7);
-
-      newSchedule.push({
-        ...shift,
-        id: createShiftId(),
-        day: copiedDate.getDate(),
-        month: copiedDate.getMonth(),
-        year: copiedDate.getFullYear(),
-      });
-    });
-
-    return {
-      ...emp,
-      schedule: newSchedule,
-    };
-  });
-
-  await saveEmployees(updated);
-
-  if (shouldBackup()) {
-    await hacerBackup(updated);
-    localStorage.setItem("lastBackup", Date.now());
-  }
-
-  showToast("Semana copiada ✔");
-};
 
   const finishShift = async () => {
   if (!user || finishingShift) return;
@@ -1129,102 +1014,6 @@ const copyLatestWeekToNext = async () => {
       { hours: 0, pay: 0, active: 0 }
     );
   }, [employees, weekStart, weekEnd]);
-
-  const handleSwapShifts = async (a, b) => {
-  if (!a || !b) return;
-
-  if (a.shiftId === b.shiftId && a.employeeId === b.employeeId) {
-    showToast("Selecciona otro turno");
-    return;
-  }
-
-  const ok = window.confirm("¿Intercambiar estos turnos?");
-  if (!ok) return;
-
-  const updated = employees.map((emp) => {
-    let newSchedule = [...(emp.schedule || [])];
-
-    newSchedule = newSchedule.map((shift) => {
-      // turno A
-      if (emp.id === a.employeeId && shift.id === a.shiftId) {
-        return {
-          ...shift,
-          swappedWith: b,
-        };
-      }
-
-      // turno B
-      if (emp.id === b.employeeId && shift.id === b.shiftId) {
-        return {
-          ...shift,
-          swappedWith: a,
-        };
-      }
-
-      return shift;
-    });
-
-    return { ...emp, schedule: newSchedule };
-  });
-
-  // ahora intercambiamos realmente
-  let shiftA, shiftB;
-
-  employees.forEach((emp) => {
-    (emp.schedule || []).forEach((shift) => {
-      if (emp.id === a.employeeId && shift.id === a.shiftId) {
-        shiftA = { ...shift };
-      }
-      if (emp.id === b.employeeId && shift.id === b.shiftId) {
-        shiftB = { ...shift };
-      }
-    });
-  });
-
-  const final = updated.map((emp) => {
-    let newSchedule = [...(emp.schedule || [])];
-
-    newSchedule = newSchedule.map((shift) => {
-      if (emp.id === a.employeeId && shift.id === a.shiftId) {
-        return {
-          ...shift,
-          day: shiftB.day,
-          month: shiftB.month,
-          year: shiftB.year,
-          start: shiftB.start,
-          end: shiftB.end,
-        };
-      }
-
-      if (emp.id === b.employeeId && shift.id === b.shiftId) {
-        return {
-          ...shift,
-          day: shiftA.day,
-          month: shiftA.month,
-          year: shiftA.year,
-          start: shiftA.start,
-          end: shiftA.end,
-        };
-      }
-
-      return shift;
-    });
-
-    return { ...emp, schedule: newSchedule };
-  });
-
-  setSwapMode(false);
-  setFirstSwap(null);
-
-  await saveEmployees(final);
-
-  if (shouldBackup()) {
-    await hacerBackup(final);
-    localStorage.setItem("lastBackup", Date.now());
-  }
-
-  showToast("Turnos intercambiados 🔄");
-};
 
   const markWeekAsPaid = async (employeeId) => {
   const employee = employees.find((emp) => emp.id === employeeId);
@@ -1392,11 +1181,7 @@ const restoreLatestBackup = async () => {
     if (activeTab === "calendar") {
       return (
         <>
-        {swapMode && (
-  <div className="update-banner">
-    Selecciona el turno con el que intercambiar
-  </div>
-)}
+        
           <section className="card calendar-panel">
             <div className="calendar-header">
               {isAdmin && (
@@ -1418,41 +1203,33 @@ const restoreLatestBackup = async () => {
     setSelectedWeekActionStart(weekStart);
     setShowWeekActionModal(true);
   }}
-  onSelectEmployee={(e, shift, index) => {
-    if (!isAdmin) return;
+  onSelectEmployee={(e, shift) => {
+  if (!isAdmin) return;
 
-    if (swapMode && firstSwap && e && shift) {
-  handleSwapShifts(firstSwap, {
-    employeeId: e.id,
-    shiftId: shift.id,
-  });
-  return;
-}
+  if (shift?.day && !e) {
+    setCalendarFormDay(shift.day);
+    setCalendarFormMonth(shift.month);
+    setCalendarFormYear(shift.year);
+    setCalendarEmployeeId("");
+    setCalendarStart("");
+    setCalendarEnd("");
+    setEditingFromCalendar(null);
+    return;
+  }
 
-    if (shift?.day && !e) {
-      setCalendarFormDay(shift.day);
-      setCalendarFormMonth(shift.month);
-      setCalendarFormYear(shift.year);
-      setCalendarEmployeeId("");
-      setCalendarStart("");
-      setCalendarEnd("");
-      setEditingFromCalendar(null);
-      return;
-    }
-
-    if (e && shift) {
-      setCalendarFormDay(shift.day);
-      setCalendarFormMonth(shift.month);
-      setCalendarFormYear(shift.year);
-      setCalendarEmployeeId(String(e.id));
-      setCalendarStart(shift.start || "");
-      setCalendarEnd(shift.end || "");
-      setEditingFromCalendar({
-        employeeId: e.id,
-        shiftId: shift.id,
-      });
-    }
-  }}
+  if (e && shift) {
+    setCalendarFormDay(shift.day);
+    setCalendarFormMonth(shift.month);
+    setCalendarFormYear(shift.year);
+    setCalendarEmployeeId(String(e.id));
+    setCalendarStart(shift.start || "");
+    setCalendarEnd(shift.end || "");
+    setEditingFromCalendar({
+      employeeId: e.id,
+      shiftId: shift.id,
+    });
+  }
+}}
 />
           </section>
 
@@ -1605,6 +1382,16 @@ const restoreLatestBackup = async () => {
                 <button className="secondary-btn" onClick={closeModal}>
                   Cancelar
                 </button>
+                {editingFromCalendar && (
+  <button
+    className="danger-btn"
+    style={{ marginTop: "12px", width: "100%" }}
+    onClick={deleteShiftFromModal}
+    disabled={savingShift}
+  >
+    {savingShift ? "Borrando..." : "Borrar turno"}
+  </button>
+)}
               </div>
 
               {editingFromCalendar && (
