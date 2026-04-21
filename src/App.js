@@ -416,6 +416,7 @@ const setupAdminPushListeners = () => {
   }
 };
 
+// eslint-disable-next-line react-hooks/exhaustive-deps
 useEffect(() => {
   if (showDeleteWeekModal) {
     const weeks = getWeeksWithShifts();
@@ -423,7 +424,7 @@ useEffect(() => {
       setSelectedWeekToDelete(weeks[0].key);
     }
   }
-}, [showDeleteWeekModal, getWeeksWithShifts]);
+}, [showDeleteWeekModal, employees]);
 
 useEffect(() => {
   setupAdminPushListeners();
