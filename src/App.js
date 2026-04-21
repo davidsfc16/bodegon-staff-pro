@@ -141,7 +141,7 @@ const getEndOfWeek = (date) => {
 
   return end;
 };
-const getWeeksWithShifts = useCallback(() => {
+const getWeeksWithShifts = () => {
   const weekMap = new Map();
 
   const toLocalDateKey = (d) => {
@@ -182,8 +182,10 @@ const getWeeksWithShifts = useCallback(() => {
     });
   });
 
-  return Array.from(weekMap.values()).sort((a, b) => b.weekStart - a.weekStart);
-}, [employees, getStartOfWeek, getEndOfWeek]);
+  return Array.from(weekMap.values()).sort(
+    (a, b) => b.weekStart - a.weekStart
+  );
+};
 
 const hacerBackup = async (employees) => {
   try {
@@ -413,7 +415,7 @@ const setupAdminPushListeners = () => {
     alert("No se pudo verificar la huella");
   }
 };
-// eslint-disable-next-line react-hooks/exhaustive-deps
+
 useEffect(() => {
   if (showDeleteWeekModal) {
     const weeks = getWeeksWithShifts();
@@ -421,7 +423,8 @@ useEffect(() => {
       setSelectedWeekToDelete(weeks[0].key);
     }
   }
-}, [showDeleteWeekModal, getWeeksWithShifts]);
+}, [showDeleteWeekModal, employees]);
+
 useEffect(() => {
   setupAdminPushListeners();
 }, []);
@@ -487,20 +490,21 @@ useEffect(() => {
 
           setEmployees(data);
 
-          if (savedAdminSession.value) {
-            setIsAdmin(true);
-            setUser(null);
-          } else if (savedEmployeeSession.value) {
-            const parsed = JSON.parse(savedEmployeeSession.value);
-            const found = data.find((emp) => emp.id === parsed.employeeId);
+          if (savedEmployeeSession.value) {
+  const parsed = JSON.parse(savedEmployeeSession.value);
+  const found = data.find((emp) => emp.id === parsed.employeeId);
 
-            if (found) {
-              setUser(found);
-              setIsAdmin(false);
-            } else {
-              setUser(null);
-            }
-          }
+  if (found) {
+    setUser(found);
+    setIsAdmin(false);
+  } else {
+    setUser(null);
+    setIsAdmin(false);
+  }
+} else if (savedAdminSession.value) {
+  setIsAdmin(true);
+  setUser(null);
+}
 
           setLoading(false);
         },
@@ -677,27 +681,27 @@ return false;
   setSavingShift(true);
 
   try {
+    const targetEmployeeId = Number(calendarEmployeeId);
+
+    const shiftData = {
+      id: editingFromCalendar?.shiftId || createShiftId(),
+      day: Number(calendarFormDay),
+      month: calendarFormMonth,
+      year: calendarFormYear,
+      start: calendarStart,
+      end: calendarEnd || null,
+    };
+
     const updated = employees.map((emp) => {
-      if (emp.id !== Number(calendarEmployeeId)) return emp;
-
-      const shiftData = {
-        id: editingFromCalendar?.shiftId || createShiftId(),
-        day: Number(calendarFormDay),
-        month: calendarFormMonth,
-        year: calendarFormYear,
-        start: calendarStart,
-        end: calendarEnd || null,
-      };
-
-      const newSchedule = [...(emp.schedule || [])];
+      let newSchedule = [...(emp.schedule || [])];
 
       if (editingFromCalendar?.shiftId) {
-        const i = newSchedule.findIndex(
-          (s) => s.id === editingFromCalendar.shiftId
+        newSchedule = newSchedule.filter(
+          (s) => s.id !== editingFromCalendar.shiftId
         );
-        if (i !== -1) newSchedule[i] = shiftData;
-        else newSchedule.push(shiftData);
-      } else {
+      }
+
+      if (emp.id === targetEmployeeId) {
         newSchedule.push(shiftData);
       }
 
@@ -705,10 +709,12 @@ return false;
     });
 
     await saveEmployees(updated);
+
     if (shouldBackup()) {
-  await hacerBackup(updated);
-  localStorage.setItem("lastBackup", Date.now());
-}
+      await hacerBackup(updated);
+      localStorage.setItem("lastBackup", Date.now());
+    }
+
     closeModal();
     showToast("Turno guardado ✔");
   } finally {
@@ -1373,19 +1379,27 @@ const restoreLatestBackup = async () => {
               </div>
 
               <div className="row">
-                <button
-  className="primary-btn"
-  onClick={addShift}
-  disabled={savingShift}
->
-  {savingShift ? "Guardando..." : "Guardar turno"}
-</button>
-
-                <button className="secondary-btn" onClick={closeModal}>
-                  Cancelar
-                </button>
-                {editingFromCalendar && (
   <button
+    type="button"
+    className="primary-btn"
+    onClick={addShift}
+    disabled={savingShift}
+  >
+    {savingShift ? "Guardando..." : "Guardar turno"}
+  </button>
+
+  <button
+    type="button"
+    className="secondary-btn"
+    onClick={closeModal}
+  >
+    Cancelar
+  </button>
+</div>
+
+{editingFromCalendar && (
+  <button
+    type="button"
     className="danger-btn"
     style={{ marginTop: "12px", width: "100%" }}
     onClick={deleteShiftFromModal}
@@ -1394,7 +1408,6 @@ const restoreLatestBackup = async () => {
     {savingShift ? "Borrando..." : "Borrar turno"}
   </button>
 )}
-              </div>
 
               {editingFromCalendar && (
                 <>
@@ -1891,6 +1904,7 @@ const restoreLatestBackup = async () => {
             <>
               {hasOpenShift ? (
                 <button
+  type="button"
   onClick={finishShift}
   className="primary-btn"
   disabled={finishingShift}
