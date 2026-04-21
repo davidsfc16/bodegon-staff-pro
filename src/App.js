@@ -141,7 +141,7 @@ const getEndOfWeek = (date) => {
 
   return end;
 };
-const getWeeksWithShifts = () => {
+const getWeeksWithShifts = useCallback(() => {
   const weekMap = new Map();
 
   const toLocalDateKey = (d) => {
@@ -185,7 +185,7 @@ const getWeeksWithShifts = () => {
   return Array.from(weekMap.values()).sort(
     (a, b) => b.weekStart - a.weekStart
   );
-};
+}, [employees]);
 
 const hacerBackup = async (employees) => {
   try {
