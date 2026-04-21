@@ -423,9 +423,8 @@ useEffect(() => {
       setSelectedWeekToDelete(weeks[0].key);
     }
   }
-}, [showDeleteWeekModal, employees]);
+}, [showDeleteWeekModal, getWeeksWithShifts]);
 
-// eslint-disable-next-line react-hooks/exhaustive-deps
 useEffect(() => {
   setupAdminPushListeners();
 }, []);
