@@ -424,7 +424,7 @@ useEffect(() => {
       setSelectedWeekToDelete(weeks[0].key);
     }
   }
-}, [showDeleteWeekModal, getWeeksWithShifts]);
+}, [showDeleteWeekModal, employees]);
 
 useEffect(() => {
   setupAdminPushListeners();
