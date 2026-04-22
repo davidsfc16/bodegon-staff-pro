@@ -121,7 +121,8 @@ const shouldBackup = () => {
   return diff > 6 * 60 * 60 * 1000; // 6 horas
 };
 
-const getStartOfWeek = (date) => {
+const getStartOfWeek = 
+useCallback((date) => {
   const d = new Date(date);
   const day = d.getDay();
 
@@ -130,9 +131,10 @@ const getStartOfWeek = (date) => {
 
   d.setHours(0, 0, 0, 0);
   return d;
-};
+}, []);
 
-const getEndOfWeek = (date) => {
+const getEndOfWeek = 
+useCallback((date) => {
   const start = getStartOfWeek(date);
   const end = new Date(start);
 
@@ -140,7 +142,8 @@ const getEndOfWeek = (date) => {
   end.setHours(23, 59, 59, 999);
 
   return end;
-};
+}, [getStartOfWeek]);
+
 const getWeeksWithShifts = useCallback(() => {
   const weekMap = new Map();
 
@@ -416,7 +419,6 @@ const setupAdminPushListeners = () => {
   }
 };
 
-// eslint-disable-next-line react-hooks/exhaustive-deps
 useEffect(() => {
   if (showDeleteWeekModal) {
     const weeks = getWeeksWithShifts();
@@ -424,7 +426,7 @@ useEffect(() => {
       setSelectedWeekToDelete(weeks[0].key);
     }
   }
-}, [showDeleteWeekModal, employees]);
+}, [showDeleteWeekModal, getWeeksWithShifts]);
 
 useEffect(() => {
   setupAdminPushListeners();
