@@ -614,21 +614,7 @@ useEffect(() => {
     await Preferences.remove({ key: "adminSession" });
   };
 
-  const updateEmployeeColor = async (color) => {
-  if (!selectedSettingsEmployeeId) return;
 
-  const employee = employees.find(
-    (emp) => emp.id === Number(selectedSettingsEmployeeId)
-  );
-  if (!employee) return;
-
-  const updatedEmployee = {
-    ...employee,
-    color,
-  };
-
-  await saveSingleEmployee(updatedEmployee);
-};
 
 const isOpenShiftNow = (shift) => {
   if (!shift || !shift.start || shift.end) return false;

@@ -18,13 +18,6 @@ function CalendarMonth({
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
-  const monthLabel = useMemo(() => {
-    return new Date(currentYear, currentMonth, 1).toLocaleString("es-ES", {
-      month: "long",
-      year: "numeric",
-    });
-  }, [currentMonth, currentYear]);
-
   const firstDay = new Date(currentYear, currentMonth, 1).getDay();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
