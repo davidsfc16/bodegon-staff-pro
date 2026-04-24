@@ -149,26 +149,35 @@ const clearWeekLongPress = () => {
   <div className="calendar-wrapper">
     <div className="calendar-fixed-header">
       <div className="month-nav">
-        <button
-          className="month-btn"
-          onClick={() =>
-            setCurrentDate(new Date(currentYear, currentMonth - 1, 1))
-          }
-        >
-          ←
-        </button>
+  <button
+    className="month-btn"
+    onClick={() =>
+      setCurrentDate(
+        new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
+      )
+    }
+  >
+    ‹
+  </button>
 
-        <div className="month-label">{monthLabel}</div>
+  <div className="month-label">
+    {currentDate.toLocaleString("es-ES", {
+      month: "long",
+      year: "numeric",
+    })}
+  </div>
 
-        <button
-          className="month-btn"
-          onClick={() =>
-            setCurrentDate(new Date(currentYear, currentMonth + 1, 1))
-          }
-        >
-          →
-        </button>
-      </div>
+  <button
+    className="month-btn"
+    onClick={() =>
+      setCurrentDate(
+        new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+      )
+    }
+  >
+    ›
+  </button>
+</div>
 
       <div className="calendar-header-scroll" ref={headerScrollRef}>
         <div className="calendar-header-inner">

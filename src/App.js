@@ -121,6 +121,7 @@ const shouldBackup = () => {
   return diff > 6 * 60 * 60 * 1000; // 6 horas
 };
 
+
 const getStartOfWeek = 
 useCallback((date) => {
   const d = new Date(date);
@@ -974,6 +975,9 @@ const deleteWeekFromMonday = async () => {
 
     await saveEmployees(updated);
 
+    await Preferences.remove({ key:"adminSession" });
+    setIsAdmin(false);
+
     if (shouldBackup()) {
       await hacerBackup(updated);
       localStorage.setItem("lastBackup", Date.now());
@@ -1481,24 +1485,22 @@ const restoreLatestBackup = async () => {
             {weekEnd.toLocaleDateString()}
           </h2>
 
-          <div className="row week-nav">
-            <button
-              className="secondary-btn nav-week-btn"
-              onClick={() => setWeekOffset((w) => w - 1)}
-            >
-              <ChevronLeft size={18} />
-              <span>Semana anterior</span>
-            </button>
+          <div className="week-nav">
+  <button
+    className="nav-week-btn"
+    onClick={() => setWeekOffset((w) => w - 1)}
+  >
+    ‹ Semana anterior
+  </button>
 
-            <button
-              className="secondary-btn nav-week-btn"
-              disabled={weekOffset === 0}
-              onClick={() => setWeekOffset((w) => Math.min(w + 1, 0))}
-            >
-              <span>Semana actual</span>
-              <ChevronRight size={18} />
-            </button>
-          </div>
+  <button
+    className="nav-week-btn"
+    disabled={weekOffset === 0}
+    onClick={() => setWeekOffset((w) => Math.min(w + 1, 0))}
+  >
+    Semana actual ›
+  </button>
+</div>
 
           <div className="shift-list">
             {employees.map((emp) => {
@@ -1743,127 +1745,132 @@ const restoreLatestBackup = async () => {
               </div>
 
               {settingsTab === "employees" && (
-                <>
-                  <h3 className="subsection-title">Añadir empleado</h3>
+  <>
 
-                  <input
-                    className="input"
-                    placeholder="Nombre del empleado"
-                    value={newEmployeeName}
-                    onChange={(e) => setNewEmployeeName(e.target.value)}
-                  />
+    {/* AÑADIR EMPLEADO */}
+    <div className="settings-card">
+      <h3 className="subsection-title">Añadir empleado</h3>
 
-                  <input
-                    className="input"
-                    placeholder="PIN inicial"
-                    value={newEmployeePin}
-                    onChange={(e) => setNewEmployeePin(e.target.value)}
-                  />
+      <input
+        className="input"
+        placeholder="Nombre del empleado"
+        value={newEmployeeName}
+        onChange={(e) => setNewEmployeeName(e.target.value)}
+      />
 
-                  <div style={{ marginBottom: "10px" }}>
-                    <p style={{ fontWeight: 700, marginBottom: "6px" }}>
-                      Color del empleado
-                    </p>
+      <input
+        className="input"
+        placeholder="PIN inicial"
+        value={newEmployeePin}
+        onChange={(e) => setNewEmployeePin(e.target.value)}
+      />
 
-                    <div
-                      style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
-                    >
-                      {COLOR_PALETTE.map((color) => (
-                        <div
-                          key={color}
-                          onClick={() => setSelectedColor(color)}
-                          style={{
-                            width: "28px",
-                            height: "28px",
-                            borderRadius: "50%",
-                            backgroundColor: color,
-                            cursor: "pointer",
-                            border:
-                              selectedColor === color
-                                ? "3px solid #111827"
-                                : "2px solid #e5e7eb",
-                            transform:
-                              selectedColor === color
-                                ? "scale(1.1)"
-                                : "scale(1)",
-                            transition: "0.2s",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+      <details>
+        <summary className="color-summary">
+          {selectedColor ? "Color seleccionado" : "Elegir color"}
+        </summary>
 
-                  <button className="primary-btn" onClick={addEmployee}>
-                    Crear empleado
-                  </button>
+        <div className="color-picker">
+          {COLOR_PALETTE.map((color) => (
+            <div
+              key={color}
+              onClick={() => setSelectedColor(color)}
+              className={`color-dot ${
+                selectedColor === color ? "selected" : ""
+              }`}
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+      </details>
 
-                  <h3 className="subsection-title">Cambiar color</h3>
+      <button className="primary-btn" onClick={addEmployee}>
+        Crear empleado
+      </button>
+    </div>
 
-<select
-  className="input"
-  value={selectedSettingsEmployeeId}
-  onChange={(e) => setSelectedSettingsEmployeeId(e.target.value)}
->
-  <option value="">Selecciona empleado</option>
-  {employees.map((emp) => (
-    <option key={emp.id} value={emp.id}>
-      {emp.name}
-    </option>
-  ))}
-</select>
 
-<div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-  {COLOR_PALETTE.map((color) => (
-    <div
-      key={color}
-      onClick={() => updateEmployeeColor(color)}
-      style={{
-        width: "28px",
-        height: "28px",
-        borderRadius: "50%",
-        backgroundColor: color,
-        cursor: "pointer",
-      }}
-    />
-  ))}
-</div>
+    {/* CAMBIAR COLOR */}
+    <div className="settings-card">
+      <h3 className="subsection-title">Cambiar color</h3>
 
-                  <h3 className="subsection-title">Borrar empleado</h3>
+      <select
+        className="input"
+        value={selectedSettingsEmployeeId}
+        onChange={(e) => setSelectedSettingsEmployeeId(e.target.value)}
+      >
+        <option value="">Selecciona empleado</option>
+        {employees.map((emp) => (
+          <option key={emp.id} value={emp.id}>
+            {emp.name}
+          </option>
+        ))}
+      </select>
 
-<button
-  className="secondary-btn"
-  onClick={() => setShowDeleteEmployees((prev) => !prev)}
->
-  {showDeleteEmployees ? "Ocultar" : "Ver empleados"}
-</button>
+      <details>
+        <summary className="color-summary">
+          {selectedColor ? "Color seleccionado" : "Elegir color"}
+        </summary>
 
-{showDeleteEmployees && (
-  <div className="shift-list">
-    {employees.map((emp) => (
-      <div key={emp.id} className="shift-item">
-        <strong>{emp.name}</strong>
+        <div className="color-picker">
+          {COLOR_PALETTE.map((color) => (
+            <div
+              key={color}
+              onClick={() => setSelectedColor(color)}
+              className={`color-dot ${
+                selectedColor === color ? "selected" : ""
+              }`}
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+      </details>
+    </div>
 
-        <button
-          className="danger-btn"
-          onClick={() => deleteEmployee(emp.id)}
-        >
-          Borrar
-        </button>
-      </div>
-    ))}
-  </div>
-)}
-<h3 className="subsection-title" style={{ marginTop: "20px" }}>
-  Copia de seguridad
-</h3>
 
-<button
-  className="secondary-btn"
-  onClick={restoreLatestBackup}
-  disabled={restoringBackup}
->
-  {restoringBackup ? "Restaurando..." : "Restaurar última copia"}
-</button>
+    {/* BORRAR EMPLEADO */}
+    <div className="settings-card">
+      <h3 className="subsection-title">Borrar empleado</h3>
+
+      <button
+        className="secondary-btn"
+        onClick={() => setShowDeleteEmployees((prev) => !prev)}
+      >
+        {showDeleteEmployees ? "Ocultar" : "Ver empleados"}
+      </button>
+
+      {showDeleteEmployees && (
+        <div className="shift-list">
+          {employees.map((emp) => (
+            <div key={emp.id} className="shift-item">
+              <strong>{emp.name}</strong>
+
+              <button
+                className="danger-btn"
+                onClick={() => deleteEmployee(emp.id)}
+              >
+                Borrar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+
+    {/* BACKUP */}
+    <div className="settings-card">
+      <h3 className="subsection-title">Copia de seguridad</h3>
+
+      <button
+        className="secondary-btn"
+        onClick={restoreLatestBackup}
+        disabled={restoringBackup}
+      >
+        {restoringBackup ? "Restaurando..." : "Restaurar última copia"}
+      </button>
+    </div>
+
   </>
 )}
 
