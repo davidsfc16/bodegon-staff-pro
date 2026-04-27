@@ -214,11 +214,17 @@ function CalendarMonth({
                 <div className="calendar-shifts">
                   {shifts.map(({ employee, shift }, i) => (
                     <div
-                      key={`${employee.id || employee.name}-${i}`}
+                      key={`${employee.id || employee.name}-${shift.id || i}`}
                       className="calendar-shift"
                       style={{
                         backgroundColor: employee.color || "#2563eb",
                       }}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onSelectEmployee?.(employee, shift, i);
+                      }}
+                      onMouseDown={(ev) => ev.stopPropagation()}
+                      onTouchStart={(ev) => ev.stopPropagation()}
                     >
                       <div className="calendar-shift-name">{employee.name}</div>
                       <div className="calendar-shift-time">

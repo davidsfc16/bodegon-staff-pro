@@ -96,7 +96,7 @@ const [selectedWeekToDelete, setSelectedWeekToDelete] = useState("");
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState("calendar");
-  const [settingsTab, setSettingsTab] = useState("employees");
+  const [settingsTab, setSettingsTab] = useState("overview");
 
   const [adminPin, setAdminPin] = useState("");
   const [selectedLoginEmployee, setSelectedLoginEmployee] = useState(null);
@@ -122,7 +122,7 @@ const [selectedWeekToDelete, setSelectedWeekToDelete] = useState("");
   const [newPinValue, setNewPinValue] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState(false);
 const [currentVersion, setCurrentVersion] = useState(null);
-const [showDeleteEmployees, setShowDeleteEmployees] = useState(false);
+const [, setShowDeleteEmployees] = useState(false);
 const [savingShift, setSavingShift] = useState(false);
 const [restoringBackup, setRestoringBackup] = useState(false);
 const [toast, setToast] = useState("");
@@ -614,7 +614,7 @@ useEffect(() => {
     setAdminPin("");
     setEmployeePin("");
     setSelectedLoginEmployee(null);
-    setSettingsTab("employees");
+    setSettingsTab("overview");
     closeModal();
 
     await Preferences.remove({ key: "employeeSession" });
@@ -822,55 +822,88 @@ const copySpecificWeekToNext = async () => {
   const { start: sourceWeekStart, end: sourceWeekEnd } =
     getWeekRangeFromStart(selectedWeekActionStart);
 
-  const targetWeekStart = new Date(sourceWeekStart);
-  targetWeekStart.setDate(targetWeekStart.getDate() + 7);
-
-  const targetWeekEnd = new Date(sourceWeekEnd);
-  targetWeekEnd.setDate(targetWeekEnd.getDate() + 7);
-
-  const targetHasShifts = employees.some((emp) =>
+  const hasSourceShifts = employees.some((emp) =>
     (emp.schedule || []).some((shift) => {
       const shiftDate = createShiftDate(shift);
-      return shiftDate >= targetWeekStart && shiftDate <= targetWeekEnd;
+      return shiftDate >= sourceWeekStart && shiftDate <= sourceWeekEnd;
     })
   );
 
-  if (targetHasShifts) {
-    showToast("La semana siguiente ya tiene turnos");
+  if (!hasSourceShifts) {
+    showToast("Esta semana no tiene turnos");
     return;
   }
 
+  const weekHasShifts = (weekStart) => {
+    const { start, end } = getWeekRangeFromStart(weekStart);
+
+    return employees.some((emp) =>
+      (emp.schedule || []).some((shift) => {
+        const shiftDate = createShiftDate(shift);
+        return shiftDate >= start && shiftDate <= end;
+      })
+    );
+  };
+
+  let targetWeekStart = new Date(sourceWeekStart);
+  targetWeekStart.setDate(targetWeekStart.getDate() + 7);
+
+  let safety = 0;
+  while (weekHasShifts(targetWeekStart) && safety < 52) {
+    targetWeekStart.setDate(targetWeekStart.getDate() + 7);
+    safety += 1;
+  }
+
+  if (safety >= 52) {
+    showToast("No se encontró una semana libre");
+    return;
+  }
+
+  const daysToMove = Math.round(
+    (targetWeekStart.getTime() - sourceWeekStart.getTime()) /
+      (24 * 60 * 60 * 1000)
+  );
+
+  const formatDate = (d) =>
+    d.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
   const ok = window.confirm(
-    "¿Copiar esta semana a la siguiente? No se borrará ningún turno existente."
+    `¿Copiar esta semana a la semana libre que empieza el ${formatDate(
+      targetWeekStart
+    )}? Solo se copiará la hora de entrada.`
   );
 
   if (!ok) return;
 
   const updated = employees.map((emp) => {
-    const newSchedule = [...(emp.schedule || [])];
+    const existingSchedule = emp.schedule || [];
 
-    const sourceShifts = (emp.schedule || []).filter((shift) => {
+    const sourceShifts = existingSchedule.filter((shift) => {
       const shiftDate = createShiftDate(shift);
       return shiftDate >= sourceWeekStart && shiftDate <= sourceWeekEnd;
     });
 
-    sourceShifts.forEach((shift) => {
-      const originalDate = createShiftDate(shift);
-      const copiedDate = new Date(originalDate);
-      copiedDate.setDate(copiedDate.getDate() + 7);
+    const copiedShifts = sourceShifts.map((shift) => {
+      const copiedDate = createShiftDate(shift);
+      copiedDate.setDate(copiedDate.getDate() + daysToMove);
 
-      newSchedule.push({
-        ...shift,
+      return {
         id: createShiftId(),
         day: copiedDate.getDate(),
         month: copiedDate.getMonth(),
         year: copiedDate.getFullYear(),
-      });
+        start: shift.start,
+        end: null,
+      };
     });
 
     return {
       ...emp,
-      schedule: newSchedule,
+      schedule: [...existingSchedule, ...copiedShifts],
     };
   });
 
@@ -884,7 +917,7 @@ const copySpecificWeekToNext = async () => {
     localStorage.setItem("lastBackup", Date.now());
   }
 
-  showToast("Semana copiada ✔");
+  showToast("Semana copiada sin horas de salida ✔");
 };
 
 const deleteWeekFromMonday = async () => {
@@ -1725,288 +1758,444 @@ const restoreLatestBackup = async () => {
     }
 
     if (activeTab === "settings") {
-      return (
-        <section className="card">
-          <h2 className="section-title">{isAdmin ? "Ajustes" : "Mi cuenta"}</h2>
+      if (!isAdmin) {
+        return (
+          <section className="card account-panel">
+            <h2 className="section-title">Mi cuenta</h2>
 
-          {isAdmin ? (
+            {hasOpenShift ? (
+              <button
+                type="button"
+                onClick={finishShift}
+                className="primary-btn"
+                disabled={finishingShift}
+              >
+                {finishingShift ? "Terminando turno..." : "Terminar turno"}
+              </button>
+            ) : (
+              <div className="empty-box">
+                No tienes ningún turno activo ahora mismo.
+              </div>
+            )}
+
+            {user && (
+              <div className="card inner-card account-summary-card">
+                <div className="row account-week-nav">
+                  <button
+                    className="secondary-btn week-mini-btn"
+                    onClick={() => setEmployeeWeekOffset((w) => w - 1)}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+
+                  <span className="account-week-label">
+                    {employeeWeekStart.toLocaleDateString()} - {" "}
+                    {employeeWeekEnd.toLocaleDateString()}
+                  </span>
+
+                  <button
+                    className="secondary-btn week-mini-btn"
+                    disabled={employeeWeekOffset === 0}
+                    onClick={() =>
+                      setEmployeeWeekOffset((w) => Math.min(w + 1, 0))
+                    }
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+
+                <h3 className="subsection-title">Mi resumen semanal</h3>
+
+                {(() => {
+                  const stats = calculateWeeklyHours(
+                    user.schedule || [],
+                    employeeWeekStart,
+                    employeeWeekEnd
+                  );
+
+                  return (
+                    <div className="stats-grid">
+                      <div className="stat-box">
+                        <span className="stat-label">Normales</span>
+                        <strong className="stat-value">
+                          {formatHours(stats.normalHours)}
+                        </strong>
+                      </div>
+
+                      <div className="stat-box">
+                        <span className="stat-label">Extras</span>
+                        <strong className="stat-value">
+                          {formatHours(stats.extraHours)}
+                        </strong>
+                      </div>
+
+                      <div className="stat-box highlighted">
+                        <span className="stat-label">Total</span>
+                        <strong className="stat-value">
+                          {stats.totalPay.toFixed(2)} €
+                        </strong>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </section>
+        );
+      }
+
+      const selectedSettingsEmployee = employees.find(
+        (emp) => emp.id === Number(selectedSettingsEmployeeId)
+      );
+
+      const goSettingsHome = () => {
+        setSettingsTab("overview");
+        setSelectedSettingsEmployeeId("");
+        setNewPinValue("");
+        setSelectedColor("");
+        setShowDeleteEmployees(false);
+      };
+
+      const SettingsBack = ({ title }) => (
+        <div className="settings-pro-topline">
+          <button className="settings-back-btn" onClick={goSettingsHome}>
+            ‹
+          </button>
+          <div>
+            <div className="settings-breadcrumb">AJUSTES &gt;</div>
+            <h2 className="section-title settings-pro-title">{title}</h2>
+          </div>
+        </div>
+      );
+
+      const ColorPicker = () => (
+        <div className="color-picker pro-color-picker">
+          {COLOR_PALETTE.map((color) => (
+            <button
+              type="button"
+              key={color}
+              onClick={() => setSelectedColor(color)}
+              className={`color-dot pro-color-dot ${
+                selectedColor === color ? "selected" : ""
+              }`}
+              style={{ backgroundColor: color }}
+              aria-label={`Elegir color ${color}`}
+            />
+          ))}
+        </div>
+      );
+
+      return (
+        <section className="card settings-pro-page">
+          {settingsTab === "overview" && (
             <>
-              <div className="settings-tabs">
+              <div className="settings-pro-header">
+                <h2 className="section-title">Ajustes</h2>
+                <p>Gestiona tu equipo y la aplicación</p>
+              </div>
+
+              <div className="settings-menu-list">
                 <button
-                  className={`secondary-btn ${
-                    settingsTab === "employees" ? "active" : ""
-                  }`}
+                  type="button"
+                  className="settings-menu-card"
                   onClick={() => setSettingsTab("employees")}
                 >
-                  Empleados
+                  <span className="settings-menu-icon blue">👥</span>
+                  <span className="settings-menu-text">
+                    <strong>Empleados</strong>
+                    <small>Añadir y gestionar empleados</small>
+                  </span>
+                  <span className="settings-menu-arrow">›</span>
                 </button>
 
                 <button
-                  className={`secondary-btn ${
-                    settingsTab === "pins" ? "active" : ""
-                  }`}
+                  type="button"
+                  className="settings-menu-card"
                   onClick={() => setSettingsTab("pins")}
                 >
-                  PINs
+                  <span className="settings-menu-icon indigo">🔒</span>
+                  <span className="settings-menu-text">
+                    <strong>PINs</strong>
+                    <small>Gestiona los PINs de acceso</small>
+                  </span>
+                  <span className="settings-menu-arrow">›</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="settings-menu-card"
+                  onClick={() => setSettingsTab("colors")}
+                >
+                  <span className="settings-menu-icon beige">🎨</span>
+                  <span className="settings-menu-text">
+                    <strong>Colores</strong>
+                    <small>Asigna y cambia colores</small>
+                  </span>
+                  <span className="settings-menu-arrow">›</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="settings-menu-card"
+                  onClick={() => setSettingsTab("delete")}
+                >
+                  <span className="settings-menu-icon red">🗑️</span>
+                  <span className="settings-menu-text">
+                    <strong>Borrar empleado</strong>
+                    <small>Eliminar empleados del sistema</small>
+                  </span>
+                  <span className="settings-menu-arrow">›</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="settings-menu-card"
+                  onClick={() => setSettingsTab("backup")}
+                >
+                  <span className="settings-menu-icon cyan">☁️</span>
+                  <span className="settings-menu-text">
+                    <strong>Copia de seguridad</strong>
+                    <small>Gestiona las copias de seguridad</small>
+                  </span>
+                  <span className="settings-menu-arrow">›</span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {settingsTab === "employees" && (
+            <>
+              <SettingsBack title="Empleados" />
+
+              <div className="settings-segmented">
+                <button className="active">Empleados</button>
+                <button onClick={() => setSettingsTab("pins")}>PINs</button>
+              </div>
+
+              <div className="settings-card pro-form-card">
+                <div className="settings-section-heading">
+                  <span className="settings-round-icon green">👤＋</span>
+                  <h3>Añadir empleado</h3>
+                </div>
+
+                <label className="settings-label">Nombre del empleado</label>
+                <input
+                  className="input"
+                  placeholder="Escribe el nombre"
+                  value={newEmployeeName}
+                  onChange={(e) => setNewEmployeeName(e.target.value)}
+                />
+
+                <label className="settings-label">PIN inicial</label>
+                <input
+                  className="input"
+                  placeholder="4 dígitos"
+                  value={newEmployeePin}
+                  onChange={(e) => setNewEmployeePin(e.target.value)}
+                />
+
+                <div className="settings-label-row">
+                  <span>Elegir color</span>
+                  <span>⌄</span>
+                </div>
+                <ColorPicker />
+
+                <button className="primary-btn" onClick={addEmployee}>
+                  Crear empleado
                 </button>
               </div>
 
-              {settingsTab === "employees" && (
-  <>
-
-    {/* AÑADIR EMPLEADO */}
-    <div className="settings-card">
-      <h3 className="subsection-title">Añadir empleado</h3>
-
-      <input
-        className="input"
-        placeholder="Nombre del empleado"
-        value={newEmployeeName}
-        onChange={(e) => setNewEmployeeName(e.target.value)}
-      />
-
-      <input
-        className="input"
-        placeholder="PIN inicial"
-        value={newEmployeePin}
-        onChange={(e) => setNewEmployeePin(e.target.value)}
-      />
-
-      <details>
-        <summary className="color-summary">
-          {selectedColor ? "Color seleccionado" : "Elegir color"}
-        </summary>
-
-        <div className="color-picker">
-          {COLOR_PALETTE.map((color) => (
-            <div
-              key={color}
-              onClick={() => setSelectedColor(color)}
-              className={`color-dot ${
-                selectedColor === color ? "selected" : ""
-              }`}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
-      </details>
-
-      <button className="primary-btn" onClick={addEmployee}>
-        Crear empleado
-      </button>
-    </div>
-
-
-    {/* CAMBIAR COLOR */}
-    <div className="settings-card">
-      <h3 className="subsection-title">Cambiar color</h3>
-
-      <select
-        className="input"
-        value={selectedSettingsEmployeeId}
-        onChange={(e) => setSelectedSettingsEmployeeId(e.target.value)}
-      >
-        <option value="">Selecciona empleado</option>
-        {employees.map((emp) => (
-          <option key={emp.id} value={emp.id}>
-            {emp.name}
-          </option>
-        ))}
-      </select>
-
-      <details>
-        <summary className="color-summary">
-          {selectedColor ? "Color seleccionado" : "Elegir color"}
-        </summary>
-
-        <div className="color-picker">
-          {COLOR_PALETTE.map((color) => (
-            <div
-              key={color}
-              onClick={() => setSelectedColor(color)}
-              className={`color-dot ${
-                selectedColor === color ? "selected" : ""
-              }`}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
-      </details>
-
-      <button
-        className="primary-btn"
-        onClick={changeEmployeeColor}
-        disabled={!selectedSettingsEmployeeId || !selectedColor}
-      >
-        Guardar color
-      </button>
-    </div>
-
-
-    {/* BORRAR EMPLEADO */}
-    <div className="settings-card">
-      <h3 className="subsection-title">Borrar empleado</h3>
-
-      <button
-        className="secondary-btn"
-        onClick={() => setShowDeleteEmployees((prev) => !prev)}
-      >
-        {showDeleteEmployees ? "Ocultar" : "Ver empleados"}
-      </button>
-
-      {showDeleteEmployees && (
-        <div className="shift-list">
-          {employees.map((emp) => (
-            <div key={emp.id} className="shift-item">
-              <strong>{emp.name}</strong>
-
               <button
-                className="danger-btn"
-                onClick={() => deleteEmployee(emp.id)}
+                type="button"
+                className="settings-menu-card compact"
+                onClick={() => setSettingsTab("delete")}
               >
-                Borrar
+                <span className="settings-menu-icon blue">👥</span>
+                <span className="settings-menu-text">
+                  <strong>Empleados registrados</strong>
+                  <small>Ver y gestionar empleados</small>
+                </span>
+                <span className="settings-menu-arrow">›</span>
               </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-
-
-    {/* BACKUP */}
-    <div className="settings-card">
-      <h3 className="subsection-title">Copia de seguridad</h3>
-
-      <button
-        className="secondary-btn"
-        onClick={restoreLatestBackup}
-        disabled={restoringBackup}
-      >
-        {restoringBackup ? "Restaurando..." : "Restaurar última copia"}
-      </button>
-    </div>
-
-  </>
-)}
-
-              {settingsTab === "pins" && (
-                <>
-                  <h3 className="subsection-title">Cambiar PIN</h3>
-
-                  <select
-                    className="input"
-                    value={selectedSettingsEmployeeId}
-                    onChange={(e) => {
-                      setSelectedSettingsEmployeeId(e.target.value);
-                      const emp = employees.find(
-                        (x) => x.id === Number(e.target.value)
-                      );
-                      setNewPinValue(emp?.pin || "");
-                    }}
-                  >
-                    <option value="">Selecciona empleado</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    className="input"
-                    placeholder="Nuevo PIN"
-                    value={newPinValue}
-                    onChange={(e) => setNewPinValue(e.target.value)}
-                  />
-
-                  <button className="secondary-btn" onClick={changeEmployeePin}>
-                    Guardar PIN
-                  </button>
-                </>
-              )}
             </>
-          ) : (
+          )}
+
+          {settingsTab === "pins" && (
             <>
-              {hasOpenShift ? (
-                <button
-  type="button"
-  onClick={finishShift}
-  className="primary-btn"
-  disabled={finishingShift}
->
-  {finishingShift ? "Terminando turno..." : "Terminar turno"}
-</button>
-              ) : (
-                <div className="empty-box">
-                  No tienes ningún turno activo ahora mismo.
-                </div>
-              )}
+              <SettingsBack title="PINs" />
 
-              {user && (
-                <div className="card inner-card">
+              <div className="settings-segmented">
+                <button onClick={() => setSettingsTab("employees")}>Empleados</button>
+                <button className="active">PINs</button>
+              </div>
+
+              <div className="settings-card pro-form-card">
+                <div className="settings-section-heading">
+                  <span className="settings-round-icon blue">🔒</span>
+                  <h3>Cambiar PIN</h3>
+                </div>
+
+                <label className="settings-label">Selecciona empleado</label>
+                <select
+                  className="input"
+                  value={selectedSettingsEmployeeId}
+                  onChange={(e) => {
+                    setSelectedSettingsEmployeeId(e.target.value);
+                    const emp = employees.find(
+                      (x) => x.id === Number(e.target.value)
+                    );
+                    setNewPinValue(emp?.pin || "");
+                  }}
+                >
+                  <option value="">Selecciona empleado</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="settings-label">Nuevo PIN</label>
+                <input
+                  className="input"
+                  placeholder="4 dígitos"
+                  value={newPinValue}
+                  onChange={(e) => setNewPinValue(e.target.value)}
+                />
+
+                <button className="primary-btn" onClick={changeEmployeePin}>
+                  Guardar PIN
+                </button>
+
+                <div className="settings-info-box">
+                  ℹ️ El PIN debe tener 4 dígitos
+                </div>
+              </div>
+            </>
+          )}
+
+          {settingsTab === "colors" && (
+            <>
+              <SettingsBack title="Colores" />
+
+              <div className="settings-card pro-form-card">
+                <div className="settings-section-heading">
+                  <span className="settings-round-icon beige">🎨</span>
+                  <h3>Cambiar color</h3>
+                </div>
+
+                <label className="settings-label">Selecciona empleado</label>
+                <select
+                  className="input"
+                  value={selectedSettingsEmployeeId}
+                  onChange={(e) => setSelectedSettingsEmployeeId(e.target.value)}
+                >
+                  <option value="">Selecciona empleado</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="settings-label">Elegir color</label>
+                <ColorPicker />
+
+                {selectedSettingsEmployee && selectedColor && (
                   <div
-                    className="row"
-                    style={{ marginBottom: "10px", alignItems: "center" }}
+                    className="settings-color-preview"
+                    style={{ backgroundColor: selectedColor }}
                   >
-                    <button
-                      className="secondary-btn"
-                      onClick={() => setEmployeeWeekOffset((w) => w - 1)}
-                    >
-                      <ChevronLeft size={18} />
-                    </button>
-
-                    <span style={{ fontWeight: 700 }}>
-                      {employeeWeekStart.toLocaleDateString()} -{" "}
-                      {employeeWeekEnd.toLocaleDateString()}
-                    </span>
-
-                    <button
-                      className="secondary-btn"
-                      disabled={employeeWeekOffset === 0}
-                      onClick={() =>
-                        setEmployeeWeekOffset((w) => Math.min(w + 1, 0))
-                      }
-                    >
-                      <ChevronRight size={18} />
-                    </button>
+                    <strong>{selectedSettingsEmployee.name}</strong>
+                    <span>17:00</span>
+                    <span>›</span>
                   </div>
+                )}
 
-                  <h3 className="subsection-title">Mi resumen semanal</h3>
+                <button
+                  className="primary-btn"
+                  onClick={changeEmployeeColor}
+                  disabled={!selectedSettingsEmployeeId || !selectedColor}
+                >
+                  Guardar color
+                </button>
+              </div>
+            </>
+          )}
 
-                  {(() => {
-                    const stats = calculateWeeklyHours(
-                      user.schedule || [],
-                      employeeWeekStart,
-                      employeeWeekEnd
-                    );
+          {settingsTab === "delete" && (
+            <>
+              <SettingsBack title="Borrar empleado" />
 
-                    return (
-                      <div className="stats-grid">
-                        <div className="stat-box">
-                          <span className="stat-label">Normales</span>
-                          <strong className="stat-value">
-                            {formatHours(stats.normalHours)}
-                          </strong>
-                        </div>
-
-                        <div className="stat-box">
-                          <span className="stat-label">Extras</span>
-                          <strong className="stat-value">
-                            {formatHours(stats.extraHours)}
-                          </strong>
-                        </div>
-
-                        <div className="stat-box highlighted">
-                          <span className="stat-label">Total</span>
-                          <strong className="stat-value">
-                            {stats.totalPay.toFixed(2)} €
-                          </strong>
-                        </div>
-                      </div>
-                    );
-                  })()}
+              <div className="settings-card pro-form-card danger-zone-card">
+                <div className="settings-section-heading">
+                  <span className="settings-round-icon red">🗑️</span>
+                  <h3>Borrar empleado</h3>
                 </div>
-              )}
+
+                <label className="settings-label">Selecciona empleado</label>
+                <select
+                  className="input"
+                  value={selectedSettingsEmployeeId}
+                  onChange={(e) => setSelectedSettingsEmployeeId(e.target.value)}
+                >
+                  <option value="">Selecciona empleado</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="settings-warning-box">
+                  <strong>⚠️ Esta acción no se puede deshacer</strong>
+                  <span>
+                    Se eliminarán todos los datos del empleado, incluyendo turnos e historial.
+                  </span>
+                </div>
+
+                <button
+                  className="danger-btn danger-full-btn"
+                  disabled={!selectedSettingsEmployeeId}
+                  onClick={() => deleteEmployee(Number(selectedSettingsEmployeeId))}
+                >
+                  Eliminar empleado
+                </button>
+              </div>
+            </>
+          )}
+
+          {settingsTab === "backup" && (
+            <>
+              <SettingsBack title="Copia de seguridad" />
+
+              <div className="settings-card pro-form-card">
+                <div className="settings-section-heading">
+                  <span className="settings-round-icon cyan">☁️</span>
+                  <h3>Copia de seguridad</h3>
+                </div>
+
+                <div className="settings-backup-card">
+                  <span>📅</span>
+                  <div>
+                    <strong>Última copia</strong>
+                    <small>Automática cada 6 horas</small>
+                  </div>
+                  <em>Activa</em>
+                </div>
+
+                <button
+                  className="secondary-btn backup-btn"
+                  onClick={restoreLatestBackup}
+                  disabled={restoringBackup}
+                >
+                  {restoringBackup ? "Restaurando..." : "Restaurar última copia"}
+                </button>
+
+                <div className="settings-info-box">
+                  ℹ️ Las copias se guardan automáticamente en la nube de forma segura.
+                </div>
+              </div>
             </>
           )}
         </section>

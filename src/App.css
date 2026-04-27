@@ -1550,3 +1550,411 @@ body {
   }
 }
 
+
+/* ==========================================================
+   AJUSTES PRO + CALENDARIO 4 DÍAS + BOTONES NARANJA
+   ========================================================== */
+
+.primary-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 12px 24px rgba(245, 158, 11, 0.24) !important;
+  cursor: pointer;
+}
+
+.primary-btn:disabled,
+.danger-btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.settings-pro-page {
+  padding: 18px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.07);
+}
+
+.settings-pro-header {
+  margin-bottom: 18px;
+}
+
+.settings-pro-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.settings-menu-list {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-menu-card {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 17px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 48px 1fr 18px;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.settings-menu-card:active {
+  transform: scale(0.985);
+}
+
+.settings-menu-card.compact {
+  margin-top: 12px;
+}
+
+.settings-menu-icon,
+.settings-round-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.settings-menu-icon.blue,
+.settings-round-icon.blue {
+  background: #eef4ff;
+}
+
+.settings-menu-icon.indigo,
+.settings-round-icon.indigo {
+  background: #eef2ff;
+}
+
+.settings-menu-icon.beige,
+.settings-round-icon.beige {
+  background: #fff7ed;
+}
+
+.settings-menu-icon.red,
+.settings-round-icon.red {
+  background: #fee2e2;
+}
+
+.settings-menu-icon.cyan,
+.settings-round-icon.cyan {
+  background: #e0f2fe;
+}
+
+.settings-round-icon.green {
+  background: #dcfce7;
+}
+
+.settings-menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-menu-text strong {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.settings-menu-text small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.settings-menu-arrow {
+  color: #334155;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.settings-pro-topline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.settings-back-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  border: none;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.07);
+  cursor: pointer;
+}
+
+.settings-breadcrumb {
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
+}
+
+.settings-pro-title {
+  margin: 0;
+}
+
+.settings-segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 5px;
+  border-radius: 15px;
+  background: #f1f5f9;
+  margin-bottom: 14px;
+}
+
+.settings-segmented button {
+  border: none;
+  border-radius: 12px;
+  padding: 11px 10px;
+  background: transparent;
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.settings-segmented button.active {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.22);
+}
+
+.pro-form-card {
+  border-radius: 22px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
+}
+
+.settings-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.settings-section-heading h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 950;
+  color: #111827;
+}
+
+.settings-label,
+.settings-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 900;
+  margin: 8px 0 7px;
+}
+
+.pro-color-picker {
+  gap: 14px;
+  margin: 12px 0 18px;
+}
+
+.pro-color-dot,
+.color-dot.pro-color-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  box-shadow: 0 7px 14px rgba(15, 23, 42, 0.10);
+  cursor: pointer;
+}
+
+.pro-color-dot.selected,
+.color-dot.pro-color-dot.selected {
+  border: 3px solid #ffffff;
+  outline: 3px solid #22c55e;
+  transform: scale(1.08);
+}
+
+.settings-info-box,
+.settings-warning-box {
+  margin-top: 14px;
+  border-radius: 14px;
+  padding: 13px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.settings-info-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.settings-warning-box {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #991b1b;
+  display: grid;
+  gap: 7px;
+}
+
+.settings-color-preview {
+  margin: 8px 0 16px;
+  border-radius: 16px;
+  padding: 13px 14px;
+  color: #ffffff;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+}
+
+.settings-backup-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.settings-backup-card strong,
+.settings-backup-card small {
+  display: block;
+}
+
+.settings-backup-card small {
+  color: #64748b;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.settings-backup-card em {
+  font-style: normal;
+  color: #16a34a;
+  background: #dcfce7;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.backup-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+}
+
+.danger-zone-card {
+  border-color: #fecdd3;
+}
+
+.danger-full-btn {
+  width: 100%;
+  border-radius: 14px;
+  padding: 13px;
+  margin-top: 14px;
+  font-weight: 900;
+}
+
+.account-week-nav {
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.account-week-label {
+  font-weight: 800;
+  text-align: center;
+}
+
+.week-mini-btn {
+  max-width: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Calendario: mismo diseño, más compacto y unas 4 columnas visibles en móvil */
+.calendar-header-inner,
+.calendar-body-inner,
+.calendar-weekdays,
+.calendar-grid {
+  min-width: 664px !important;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  grid-template-columns: repeat(7, minmax(86px, 1fr)) !important;
+  gap: 7px !important;
+}
+
+.calendar-cell {
+  min-height: 78px !important;
+  padding: 5px !important;
+}
+
+.calendar-day-number {
+  margin-bottom: 5px !important;
+  font-size: 11px !important;
+}
+
+.calendar-shifts {
+  gap: 4px !important;
+}
+
+.calendar-shift {
+  padding: 3px 5px !important;
+  border-radius: 8px !important;
+  margin-top: 0 !important;
+}
+
+.calendar-shift-name {
+  font-size: 10px !important;
+  line-height: 1.08 !important;
+}
+
+.calendar-shift-time {
+  font-size: 9px !important;
+  margin-top: 1px !important;
+}
+
+@media (max-width: 380px) {
+  .calendar-header-inner,
+  .calendar-body-inner,
+  .calendar-weekdays,
+  .calendar-grid {
+    min-width: 636px !important;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(82px, 1fr)) !important;
+  }
+}
