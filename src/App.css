@@ -1118,3 +1118,435 @@ body {
 .calendar-wrapper {
   margin-top: -4px;
 }
+
+/* =========================================================
+   NOVEDADES FINALES - KIOSCO BODEGÓN
+   Botones premium, ajustes limpios, calendario compacto,
+   banner de actualización y mejoras móviles.
+   ========================================================= */
+
+/* ===== BOTONES PRINCIPALES ARREGLADOS ===== */
+
+.primary-btn {
+  border: none;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(245, 158, 11, 0.24);
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(245, 158, 11, 0.28);
+}
+
+.primary-btn:active {
+  transform: scale(0.97);
+}
+
+.employee-login-btn:hover,
+.secondary-btn:hover,
+.danger-btn:hover,
+.update-btn:hover {
+  transform: translateY(-1px);
+}
+
+.employee-login-btn strong,
+.employee-login-btn span {
+  color: inherit;
+}
+
+/* Botones de fichaje / terminar turno si existen en App.js */
+.shift-btn,
+.clock-btn,
+.finish-shift-btn,
+.end-shift-btn {
+  width: 100%;
+  border: none;
+  border-radius: 16px;
+  padding: 13px 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+
+.shift-btn.enter,
+.clock-btn.enter {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(22, 163, 74, 0.20);
+}
+
+.shift-btn.exit,
+.clock-btn.exit,
+.finish-shift-btn,
+.end-shift-btn {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(220, 38, 38, 0.20);
+}
+
+.shift-btn:active,
+.clock-btn:active,
+.finish-shift-btn:active,
+.end-shift-btn:active {
+  transform: scale(0.96);
+}
+
+/* ===== AJUSTES MÁS PREMIUM ===== */
+
+.settings-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow:
+    0 16px 34px rgba(15, 23, 42, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.settings-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-dark));
+  opacity: 0.9;
+}
+
+.settings-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.1px;
+}
+
+.settings-tabs {
+  background: #f1f5f9;
+  padding: 5px;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+}
+
+.settings-tabs .secondary-btn {
+  background: transparent;
+  color: #475569;
+  box-shadow: none;
+  border-radius: 14px;
+  padding: 11px 10px;
+}
+
+.settings-tabs .secondary-btn.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+  box-shadow: 0 10px 20px rgba(245, 158, 11, 0.22);
+}
+
+.color-summary {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.color-dot {
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+.color-dot.selected {
+  border: 3px solid #ffffff;
+  outline: 3px solid #111827;
+}
+
+/* ===== CALENDARIO MÁS CÓMODO ===== */
+
+.calendar-panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+}
+
+.calendar-fixed,
+.calendar-fixed-header {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+.calendar-body-scroll {
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.calendar-body-scroll::-webkit-scrollbar {
+  height: 7px;
+}
+
+.calendar-body-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 999px;
+}
+
+.calendar-body-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.calendar-cell {
+  min-height: 78px;
+  padding: 6px;
+}
+
+.calendar-day-number {
+  display: inline-flex;
+  min-width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  margin-bottom: 5px;
+}
+
+.calendar-today .calendar-day-number {
+  background: var(--gold);
+  color: #ffffff;
+}
+
+.calendar-shift {
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.calendar-other-month {
+  filter: grayscale(0.2);
+}
+
+/* ===== COPIAR SEMANA / ACCIONES ===== */
+
+.copy-week-btn {
+  background: linear-gradient(135deg, #111827 0%, #0f172a 100%);
+  color: #f59e0b;
+  border: none;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+  cursor: pointer;
+}
+
+.copy-week-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.calendar-monday-action {
+  border-color: rgba(245, 158, 11, 0.65);
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+}
+
+/* ===== BANNER AUTO-ACTUALIZACIÓN ===== */
+
+.update-banner {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+}
+
+.update-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(245, 158, 11, 0.22), transparent 36%);
+  pointer-events: none;
+}
+
+.update-banner > * {
+  position: relative;
+  z-index: 1;
+}
+
+.update-btn {
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+}
+
+/* ===== TOPBAR Y NAVEGACIÓN ===== */
+
+.topbar {
+  min-height: 64px;
+}
+
+.bottom-nav {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bottom-nav-btn.active {
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.28);
+}
+
+/* ===== LISTAS MÁS COMPACTAS ===== */
+
+.employee-card,
+.shift-item {
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+.employee-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.07);
+}
+
+.shift-item-pay {
+  color: #0f172a;
+}
+
+/* ===== MÓVIL ===== */
+
+@media (max-width: 700px) {
+  .topbar {
+    margin: -14px -14px 2px -14px;
+    padding: 9px 12px 7px;
+  }
+
+  .topbar-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .topbar-title {
+    font-size: 16px;
+  }
+
+  .topbar-user {
+    font-size: 10px;
+  }
+
+  .brand-card {
+    padding: 22px 16px;
+    border-radius: 24px;
+  }
+
+  .brand-logo {
+    width: 118px;
+  }
+
+  .card {
+    border-radius: 20px;
+    padding: 12px;
+  }
+
+  .settings-card {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .settings-tabs {
+    gap: 6px;
+  }
+
+  .settings-tabs .secondary-btn {
+    font-size: 12px;
+    padding: 10px 6px;
+  }
+
+  .month-nav {
+    gap: 10px;
+    padding: 8px;
+    margin-bottom: 10px;
+  }
+
+  .month-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+  }
+
+  .month-label {
+    min-width: 138px;
+    font-size: 16px;
+  }
+
+  .calendar-header-inner,
+  .calendar-body-inner,
+  .calendar-weekdays,
+  .calendar-grid {
+    min-width: 805px;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(105px, 1fr));
+  }
+
+  .calendar-cell {
+    min-height: 82px;
+    padding: 5px;
+  }
+
+  .calendar-weekday {
+    font-size: 11px;
+    padding: 8px 0;
+  }
+
+  .calendar-shift-name {
+    font-size: 10.5px;
+  }
+
+  .calendar-shift-time {
+    font-size: 9.5px;
+  }
+
+  .bottom-nav {
+    height: 68px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border-radius: 22px;
+  }
+
+  .bottom-nav-btn {
+    font-size: 10px;
+  }
+
+  .toast {
+    bottom: 84px;
+    width: calc(100% - 32px);
+    text-align: center;
+  }
+
+  .update-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .update-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .bottom-nav-btn {
+    font-size: 9px;
+  }
+
+  .month-label {
+    min-width: 120px;
+    font-size: 15px;
+  }
+
+  .calendar-header-inner,
+  .calendar-body-inner,
+  .calendar-weekdays,
+  .calendar-grid {
+    min-width: 760px;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(98px, 1fr));
+  }
+}
+

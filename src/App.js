@@ -31,9 +31,7 @@ import {
 import { BiometricAuth } from "@aparajita/capacitor-biometric-auth";
 import { db } from "./firebase";
 import CalendarMonth from "./CalendarMonth";
-import {
-  calculateWeeklyHours,
-} from "./Schedule";
+import { calculateWeeklyHours } from "./Schedule";
 import logo from "./assets/logo.png";
 import "./App.css";
 
@@ -58,6 +56,22 @@ function App() {
 
   const createShiftId = () => {
   return `shift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+};
+
+const createShiftDate = (shift) => {
+  return new Date(
+    Number(shift.year),
+    Number(shift.month),
+    Number(shift.day)
+  );
+};
+
+const toLocalDateKey = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 const [finishingShift, setFinishingShift] = useState(false);
 const [showWeekActionModal, setShowWeekActionModal] = useState(false);
@@ -148,13 +162,6 @@ useCallback((date) => {
 const getWeeksWithShifts = useCallback(() => {
   const weekMap = new Map();
 
-  const toLocalDateKey = (d) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   employees.forEach((emp) => {
     (emp.schedule || []).forEach((shift) => {
       if (
@@ -165,11 +172,7 @@ const getWeeksWithShifts = useCallback(() => {
         return;
       }
 
-      const shiftDate = new Date(
-        Number(shift.year),
-        Number(shift.month),
-        Number(shift.day)
-      );
+      const shiftDate = createShiftDate(shift);
 
       const weekStart = getStartOfWeek(shiftDate);
       const weekEnd = getEndOfWeek(shiftDate);
@@ -261,11 +264,15 @@ const checkForUpdates = useCallback(async () => {
 };
 
   const saveEmployees = async (updatedEmployees) => {
-    setEmployees(updatedEmployees);
+    const batch = writeBatch(db);
 
-    for (const emp of updatedEmployees) {
-      await setDoc(doc(db, "employees", String(emp.id)), emp);
-    }
+    updatedEmployees.forEach((emp) => {
+      batch.set(doc(db, "employees", String(emp.id)), emp);
+    });
+
+    await batch.commit();
+
+    setEmployees(updatedEmployees);
 
     if (user) {
       const refreshedUser = updatedEmployees.find((emp) => emp.id === user.id);
@@ -625,11 +632,7 @@ const isOpenShiftNow = (shift) => {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  const shiftDate = new Date(
-    Number(shift.year),
-    Number(shift.month),
-    Number(shift.day)
-  );
+  const shiftDate = createShiftDate(shift);
 
   const sameDay = (a, b) =>
     a.getFullYear() === b.getFullYear() &&
@@ -776,11 +779,7 @@ const weekEnd = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
 
   const updated = employees.map((emp) => {
     const filteredSchedule = (emp.schedule || []).filter((shift) => {
-      const shiftDate = new Date(
-        Number(shift.year),
-        Number(shift.month),
-        Number(shift.day)
-      );
+      const shiftDate = createShiftDate(shift);
 
       return shiftDate < weekStart || shiftDate > weekEnd;
     });
@@ -831,7 +830,7 @@ const copySpecificWeekToNext = async () => {
 
   const targetHasShifts = employees.some((emp) =>
     (emp.schedule || []).some((shift) => {
-      const shiftDate = new Date(shift.year, shift.month, shift.day);
+      const shiftDate = createShiftDate(shift);
       return shiftDate >= targetWeekStart && shiftDate <= targetWeekEnd;
     })
   );
@@ -841,16 +840,22 @@ const copySpecificWeekToNext = async () => {
     return;
   }
 
+  const ok = window.confirm(
+    "¿Copiar esta semana a la siguiente? No se borrará ningún turno existente."
+  );
+
+  if (!ok) return;
+
   const updated = employees.map((emp) => {
     const newSchedule = [...(emp.schedule || [])];
 
     const sourceShifts = (emp.schedule || []).filter((shift) => {
-      const shiftDate = new Date(shift.year, shift.month, shift.day);
+      const shiftDate = createShiftDate(shift);
       return shiftDate >= sourceWeekStart && shiftDate <= sourceWeekEnd;
     });
 
     sourceShifts.forEach((shift) => {
-      const originalDate = new Date(shift.year, shift.month, shift.day);
+      const originalDate = createShiftDate(shift);
       const copiedDate = new Date(originalDate);
       copiedDate.setDate(copiedDate.getDate() + 7);
 
@@ -905,11 +910,7 @@ const deleteWeekFromMonday = async () => {
 
   const updated = employees.map((emp) => {
     const filteredSchedule = (emp.schedule || []).filter((shift) => {
-      const shiftDate = new Date(
-        Number(shift.year),
-        Number(shift.month),
-        Number(shift.day)
-      );
+      const shiftDate = createShiftDate(shift);
 
       return shiftDate < weekStart || shiftDate > weekEnd;
     });
@@ -960,9 +961,6 @@ const deleteWeekFromMonday = async () => {
     });
 
     await saveEmployees(updated);
-
-    await Preferences.remove({ key:"adminSession" });
-    setIsAdmin(false);
 
     if (shouldBackup()) {
       await hacerBackup(updated);
@@ -1090,6 +1088,25 @@ const deleteWeekFromMonday = async () => {
 
   await saveSingleEmployee(updatedEmployee);
   setNewPinValue("");
+  showToast("PIN actualizado ✔");
+};
+
+const changeEmployeeColor = async () => {
+  if (!selectedSettingsEmployeeId || !selectedColor) return;
+
+  const employee = employees.find(
+    (emp) => emp.id === Number(selectedSettingsEmployeeId)
+  );
+  if (!employee) return;
+
+  const updatedEmployee = {
+    ...employee,
+    color: selectedColor,
+  };
+
+  await saveSingleEmployee(updatedEmployee);
+  setSelectedColor("");
+  showToast("Color actualizado ✔");
 };
 
 const restoreLatestBackup = async () => {
@@ -1395,7 +1412,11 @@ const restoreLatestBackup = async () => {
     type="button"
     className="danger-btn"
     style={{ marginTop: "12px", width: "100%" }}
-    onClick={deleteShiftFromModal}
+    onClick={() => {
+      if (window.confirm("¿Seguro que quieres borrar este turno?")) {
+        deleteShiftFromModal();
+      }
+    }}
     disabled={savingShift}
   >
     {savingShift ? "Borrando..." : "Borrar turno"}
@@ -1811,6 +1832,14 @@ const restoreLatestBackup = async () => {
           ))}
         </div>
       </details>
+
+      <button
+        className="primary-btn"
+        onClick={changeEmployeeColor}
+        disabled={!selectedSettingsEmployeeId || !selectedColor}
+      >
+        Guardar color
+      </button>
     </div>
 
 
@@ -1992,7 +2021,7 @@ const restoreLatestBackup = async () => {
       <div className="login-screen">
         <div className="brand-card">
           <img src={logo} alt="Kiosco Bodegón" className="brand-logo" />
-          <h1 className="brand-title">Kiosco Bodegón TEST</h1>
+          <h1 className="brand-title">Kiosco Bodegón</h1>
           <p className="brand-subtitle">Cargando datos…</p>
         </div>
       </div>

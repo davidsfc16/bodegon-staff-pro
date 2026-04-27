@@ -80,14 +80,14 @@ function CalendarMonth({
           }))
       )
       .sort((a, b) => {
-  const toMinutes = (time) => {
-    if (!time) return 9999;
-    const [h, m] = String(time).split(":").map(Number);
-    return h * 60 + m;
-  };
+        const toMinutes = (time) => {
+          if (!time) return 9999;
+          const [h, m] = String(time).split(":").map(Number);
+          return h * 60 + m;
+        };
 
-  return toMinutes(a.shift?.start) - toMinutes(b.shift?.start);
-});
+        return toMinutes(a.shift?.start) - toMinutes(b.shift?.start);
+      });
   };
 
   const syncHeaderScroll = () => {
@@ -96,84 +96,77 @@ function CalendarMonth({
   };
 
   const getStartOfWeekFromDayObj = (dayObj) => {
-  const date = new Date(
-    Number(dayObj.year),
-    Number(dayObj.month),
-    Number(dayObj.day)
-  );
+    const date = new Date(dayObj.year, dayObj.month, dayObj.day);
+    const day = date.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
 
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // lunes
-  date.setDate(date.getDate() + diff);
-  date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + diff);
+    date.setHours(0, 0, 0, 0);
 
-  return date;
-};
+    return date;
+  };
 
-const handleWeekLongPressStart = (dayObj) => {
-  if (!isAdmin) return;
+  const clearWeekLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
-  longPressTimerRef.current = setTimeout(() => {
+  const handleWeekLongPressStart = (dayObj) => {
+    if (!isAdmin) return;
+
     clearWeekLongPress();
-    const weekStart = getStartOfWeekFromDayObj(dayObj);
-    onWeekLongPress?.(weekStart);
-  }, 500);
-};
 
-const clearWeekLongPress = () => {
-  if (longPressTimerRef.current) {
-    clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
-  }
-};
-
+    longPressTimerRef.current = setTimeout(() => {
+      clearWeekLongPress();
+      const weekStart = getStartOfWeekFromDayObj(dayObj);
+      onWeekLongPress?.(weekStart);
+    }, 600);
+  };
 
   useEffect(() => {
-  if (todayRef.current) {
-    todayRef.current.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-      inline: "nearest",
-    });
-  }
-}, [currentMonth, currentYear]);
+    if (todayRef.current) {
+      todayRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [currentMonth, currentYear]);
+
+  useEffect(() => {
+    return () => clearWeekLongPress();
+  }, []);
 
   return (
-  <div className="calendar-wrapper">
-    <div className="calendar-fixed-header">
-      <div className="month-nav">
-  <button
-    className="month-btn"
-    onClick={() =>
-      setCurrentDate(
-        new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
-      )
-    }
-  >
-    ‹
-  </button>
+    <div className="calendar-wrapper">
+      <div className="calendar-fixed-header">
+        <div className="month-nav">
+          <button
+            type="button"
+            className="month-btn"
+            onClick={() => setCurrentDate(new Date(currentYear, currentMonth - 1, 1))}
+          >
+            ‹
+          </button>
 
-  <div className="month-label">
-    {currentDate.toLocaleString("es-ES", {
-      month: "long",
-      year: "numeric",
-    })}
-  </div>
+          <div className="month-label">
+            {currentDate.toLocaleString("es-ES", {
+              month: "long",
+              year: "numeric",
+            })}
+          </div>
 
-  <button
-    className="month-btn"
-    onClick={() =>
-      setCurrentDate(
-        new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
-      )
-    }
-  >
-    ›
-  </button>
-</div>
+          <button
+            type="button"
+            className="month-btn"
+            onClick={() => setCurrentDate(new Date(currentYear, currentMonth + 1, 1))}
+          >
+            ›
+          </button>
+        </div>
 
-      <div className="calendar-header-scroll" ref={headerScrollRef}>
-        <div className="calendar-header-inner">
+        <div className="calendar-header-scroll" ref={headerScrollRef}>
           <div className="calendar-weekdays">
             {weekDays.map((d) => (
               <div key={d} className="calendar-weekday">
@@ -183,18 +176,16 @@ const clearWeekLongPress = () => {
           </div>
         </div>
       </div>
-    </div>
 
-    <div
-      className="calendar-body-scroll"
-      ref={bodyScrollRef}
-      onScroll={syncHeaderScroll}
-    >
-      <div className="calendar-body-inner">
+      <div
+        className="calendar-body-scroll"
+        ref={bodyScrollRef}
+        onScroll={syncHeaderScroll}
+      >
         <div className="calendar-grid">
           {calendarDays.map((dayObj, index) => {
             const shifts = getShiftsForDay(dayObj);
-            const isMondayCell = index % 7 === 0;
+            const isMonday = index % 7 === 0;
 
             const isToday =
               dayObj.day === today.getDate() &&
@@ -203,79 +194,47 @@ const clearWeekLongPress = () => {
 
             return (
               <div
-  key={index}
-  ref={isToday ? todayRef : null}
-  className={`calendar-cell ${
-    !dayObj.isCurrentMonth ? "calendar-other-month" : ""
-  } ${isToday ? "calendar-today" : ""} ${
-    isMondayCell && isAdmin ? "calendar-monday-action" : ""
-  }`}
-  onClick={() => {
-    onSelectEmployee?.(null, {
-      day: dayObj.day,
-      month: dayObj.month,
-      year: dayObj.year,
-    });
-  }}
-  onMouseDown={(e) => {
-  if (isMondayCell) {
-    e.preventDefault();
-    e.stopPropagation(); // 🔥 CLAVE
-    handleWeekLongPressStart(dayObj);
-  }
-}}
-  onMouseUp={clearWeekLongPress}
-  onMouseLeave={clearWeekLongPress}
-  onTouchStart={(e) => {
-  if (isMondayCell) {
-    e.preventDefault();
-    e.stopPropagation(); // 🔥 CLAVE
-    handleWeekLongPressStart(dayObj);
-  }
-}}
-  onTouchEnd={clearWeekLongPress}
-  onContextMenu={(e) => e.preventDefault()}
->
+                key={`${dayObj.year}-${dayObj.month}-${dayObj.day}-${index}`}
+                ref={isToday ? todayRef : null}
+                className={`calendar-cell ${
+                  !dayObj.isCurrentMonth ? "calendar-other-month" : ""
+                } ${isToday ? "calendar-today" : ""} ${
+                  isMonday && isAdmin ? "calendar-week-copy-zone" : ""
+                }`}
+                onClick={() => onSelectEmployee?.(null, dayObj)}
+                onMouseDown={() => isMonday && handleWeekLongPressStart(dayObj)}
+                onMouseUp={clearWeekLongPress}
+                onMouseLeave={clearWeekLongPress}
+                onTouchStart={() => isMonday && handleWeekLongPressStart(dayObj)}
+                onTouchEnd={clearWeekLongPress}
+                onTouchCancel={clearWeekLongPress}
+              >
                 <div className="calendar-day-number">{dayObj.day}</div>
 
-                {shifts.length > 0 && (
-                  <div className="calendar-shifts">
-                    {shifts.map(({ employee, shift }, shiftIndex) => {
-                      const isMine = user && user.id === employee.id;
-
-                      return (
-                        <div
-                          key={`${employee.id}-${shiftIndex}`}
-                          className="calendar-shift"
-                          style={{
-                            backgroundColor: employee.color,
-                            outline: isMine ? "2px solid #111827" : "none",
-                          }}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            onSelectEmployee?.(employee, shift, shiftIndex);
-                          }}
-                        >
-                          <span className="calendar-shift-name">
-                            {employee.name}
-                          </span>
-                          <span className="calendar-shift-time">
-                            {shift.start}
-                            {shift.end ? ` - ${shift.end}` : ""}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <div className="calendar-shifts">
+                  {shifts.map(({ employee, shift }, i) => (
+                    <div
+                      key={`${employee.id || employee.name}-${i}`}
+                      className="calendar-shift"
+                      style={{
+                        backgroundColor: employee.color || "#2563eb",
+                      }}
+                    >
+                      <div className="calendar-shift-name">{employee.name}</div>
+                      <div className="calendar-shift-time">
+                        {shift.start}
+                        {shift.end ? ` - ${shift.end}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}
         </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 export default CalendarMonth;
