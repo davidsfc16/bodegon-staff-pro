@@ -113,7 +113,7 @@ const [showAllDavidMovements, setShowAllDavidMovements] = useState(false);
   const getDaysInMonth = (date) =>
     new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 
-  const calculateDavidEarned = (startDateIso) => {
+  const calculateDavidEarned = useCallback((startDateIso) => {
     if (!startDateIso) return 0;
 
     const start = new Date(startDateIso);
@@ -132,7 +132,7 @@ const [showAllDavidMovements, setShowAllDavidMovements] = useState(false);
     }
 
     return total;
-  };
+  }, []);
 
   const formatMoney = (amount) => `${Number(amount || 0).toFixed(2)} €`;
 
