@@ -299,7 +299,7 @@ const davidMovements = useMemo(() => {
 
 const davidEarned = useMemo(
   () => calculateDavidEarned(davidAccount?.startDate),
-  [davidAccount?.startDate]
+  [davidAccount?.startDate, calculateDavidEarned]
 );
 
 const davidManualTotal = useMemo(() => {
@@ -1915,9 +1915,6 @@ const restoreLatestBackup = async () => {
     }
 
     if (activeTab === "david" && isAdmin) {
-      const startDate = davidAccount?.startDate
-        ? new Date(davidAccount.startDate).toLocaleDateString("es-ES")
-        : "pendiente";
       const visibleMovements = showAllDavidMovements
         ? davidMovements
         : davidMovements.slice(0, 5);
