@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
+import { App as CapacitorApp } from "@capacitor/app";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { Preferences } from "@capacitor/preferences";
 import {
@@ -80,12 +81,70 @@ const [selectedHistoryEmployeeId, setSelectedHistoryEmployeeId] = useState(null)
 const [showSwapModal, setShowSwapModal] = useState(false);
 const [swapCandidates, setSwapCandidates] = useState([]);
 const [baseSwapShift, setBaseSwapShift] = useState(null);
+const [davidAccount, setDavidAccount] = useState(null);
+const [davidPayAmount, setDavidPayAmount] = useState("");
+const [davidAdjustmentAmount, setDavidAdjustmentAmount] = useState("");
+const [davidAdjustmentNote, setDavidAdjustmentNote] = useState("");
+const [showAllDavidMovements, setShowAllDavidMovements] = useState(false);
 
   const formatHours = (hoursDecimal) => {
     const totalMinutes = Math.round(hoursDecimal * 60);
     const h = Math.floor(totalMinutes / 60);
     const m = totalMinutes % 60;
     return `${h}h ${m.toString().padStart(2, "0")}m`;
+  };
+
+  const DAVID_MONTHLY_SALARY = 1400;
+
+  const isDavidEmployee = (emp) =>
+    (emp?.name || "").trim().toLowerCase() === "david";
+
+  const getNextDayTen = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 10, 0, 0, 0, 0);
+
+    if (now >= start) {
+      start.setMonth(start.getMonth() + 1);
+    }
+
+    return start;
+  };
+
+  const getDaysInMonth = (date) =>
+    new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+
+  const calculateDavidEarned = (startDateIso) => {
+    if (!startDateIso) return 0;
+
+    const start = new Date(startDateIso);
+    const today = new Date();
+    start.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    if (today < start) return 0;
+
+    let cursor = new Date(start);
+    let total = 0;
+
+    while (cursor <= today) {
+      total += DAVID_MONTHLY_SALARY / getDaysInMonth(cursor);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return total;
+  };
+
+  const formatMoney = (amount) => `${Number(amount || 0).toFixed(2)} €`;
+
+  const formatMovementDate = (iso) => {
+    if (!iso) return "";
+    return new Date(iso).toLocaleString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
   const [showDeleteWeekModal, setShowDeleteWeekModal] = useState(false);
 const [selectedWeekToDelete, setSelectedWeekToDelete] = useState("");
@@ -232,6 +291,25 @@ const checkForUpdates = useCallback(async () => {
   }
 }, [currentVersion]);
 
+const davidMovements = useMemo(() => {
+  return [...(davidAccount?.movements || [])].sort(
+    (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
+  );
+}, [davidAccount]);
+
+const davidEarned = useMemo(
+  () => calculateDavidEarned(davidAccount?.startDate),
+  [davidAccount?.startDate]
+);
+
+const davidManualTotal = useMemo(() => {
+  return davidMovements.reduce((total, movement) => {
+    return total + Number(movement.amount || 0);
+  }, 0);
+}, [davidMovements]);
+
+const davidBalance = davidEarned + davidManualTotal;
+
   const vibrate = () => {
     if (navigator.vibrate) navigator.vibrate(10);
   };
@@ -278,6 +356,60 @@ const checkForUpdates = useCallback(async () => {
       const refreshedUser = updatedEmployees.find((emp) => emp.id === user.id);
       setUser(refreshedUser || null);
     }
+  };
+
+
+  const saveDavidAccount = async (nextAccount) => {
+    await setDoc(doc(db, "davidAccount", "main"), nextAccount);
+    setDavidAccount(nextAccount);
+  };
+
+  const addDavidMovement = async (type, amount, note = "") => {
+    const numericAmount = Number(String(amount).replace(",", "."));
+
+    if (!numericAmount || Number.isNaN(numericAmount)) {
+      showToast("Introduce una cantidad válida");
+      return;
+    }
+
+    const current = davidAccount || {
+      monthlySalary: DAVID_MONTHLY_SALARY,
+      startDate: getNextDayTen().toISOString(),
+      movements: [],
+    };
+
+    const signedAmount = type === "payment" ? -Math.abs(numericAmount) : numericAmount;
+
+    const nextAccount = {
+      ...current,
+      monthlySalary: DAVID_MONTHLY_SALARY,
+      movements: [
+        ...(current.movements || []),
+        {
+          id: `david_mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          type,
+          amount: signedAmount,
+          note: note.trim(),
+          date: new Date().toISOString(),
+        },
+      ],
+    };
+
+    await saveDavidAccount(nextAccount);
+
+    setDavidPayAmount("");
+    setDavidAdjustmentAmount("");
+    setDavidAdjustmentNote("");
+    showToast(type === "payment" ? "Pago guardado ✔" : "Ajuste guardado ✔");
+  };
+
+  const payAllDavidBalance = async () => {
+    if (davidBalance <= 0) {
+      showToast("No hay saldo pendiente");
+      return;
+    }
+
+    await addDavidMovement("payment", davidBalance, "Pago total");
   };
   const handleSwapFromList = async (targetShift) => {
   if (!baseSwapShift || !targetShift) return;
@@ -440,6 +572,86 @@ useEffect(() => {
   setupAdminPushListeners();
 }, []);
 
+
+useEffect(() => {
+  const accountRef = doc(db, "davidAccount", "main");
+
+  const unsubscribe = onSnapshot(accountRef, async (snapshot) => {
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      setDavidAccount({
+        monthlySalary: DAVID_MONTHLY_SALARY,
+        startDate: data.startDate || getNextDayTen().toISOString(),
+        movements: data.movements || [],
+      });
+      return;
+    }
+
+    const initialAccount = {
+      monthlySalary: DAVID_MONTHLY_SALARY,
+      startDate: getNextDayTen().toISOString(),
+      movements: [],
+    };
+
+    await setDoc(accountRef, initialAccount);
+    setDavidAccount(initialAccount);
+  });
+
+  return () => unsubscribe();
+}, []);
+
+useEffect(() => {
+  let listener;
+
+  const setupBackButton = async () => {
+    listener = await CapacitorApp.addListener("backButton", () => {
+      if (calendarFormDay !== null) {
+        closeModal();
+        return;
+      }
+
+      if (showSwapModal) {
+        setShowSwapModal(false);
+        setSwapCandidates([]);
+        setBaseSwapShift(null);
+        return;
+      }
+
+      if (showWeekActionModal) {
+        setShowWeekActionModal(false);
+        setSelectedWeekActionStart(null);
+        return;
+      }
+
+      if (showDeleteWeekModal) {
+        setShowDeleteWeekModal(false);
+        setSelectedWeekToDelete("");
+        return;
+      }
+
+      if (activeTab === "settings" && settingsTab !== "overview") {
+        setSettingsTab("overview");
+        return;
+      }
+
+      CapacitorApp.exitApp();
+    });
+  };
+
+  setupBackButton();
+
+  return () => {
+    if (listener) listener.remove();
+  };
+}, [
+  activeTab,
+  settingsTab,
+  calendarFormDay,
+  showSwapModal,
+  showWeekActionModal,
+  showDeleteWeekModal,
+]);
+
 useEffect(() => {
   if (!isAdmin) return;
 
@@ -448,7 +660,7 @@ useEffect(() => {
 
   if (!isWednesday) return;
 
-  const hasPending = employees.some((emp) => {
+  const hasPending = employees.filter((emp) => !isDavidEmployee(emp)).some((emp) => {
     const payments = emp.payments || {};
     return Object.values(payments).some((p) => !p?.paid);
   });
@@ -995,6 +1207,19 @@ const deleteWeekFromMonday = async () => {
 
     await saveEmployees(updated);
 
+    try {
+      await addDoc(collection(db, "shiftNotifications"), {
+        type: "shift_finished",
+        employeeId: user.id,
+        employeeName: user.name,
+        message: `${user.name} ha terminado su turno`,
+        createdAt: new Date().toISOString(),
+        read: false,
+      });
+    } catch (error) {
+      console.error("No se pudo crear aviso de turno terminado:", error);
+    }
+
     if (shouldBackup()) {
       await hacerBackup(updated);
       localStorage.setItem("lastBackup", Date.now());
@@ -1031,7 +1256,7 @@ const deleteWeekFromMonday = async () => {
   const employeeWeekEnd = getEndOfWeek(baseDateEmployee);
 
   const teamTotals = useMemo(() => {
-    return employees.reduce(
+    return employees.filter((emp) => !isDavidEmployee(emp)).reduce(
       (acc, emp) => {
         const stats = calculateWeeklyHours(
           emp.schedule || [],
@@ -1221,6 +1446,7 @@ const restoreLatestBackup = async () => {
         { key: "calendar", label: "Calendario", icon: CalendarDays },
         { key: "team", label: "Equipo", icon: Users },
         { key: "history", label: "Historial", icon: BarChart3 },
+        { key: "david", label: "David", icon: UserRound },
         { key: "settings", label: "Ajustes", icon: Settings },
       ]
     : [
@@ -1543,7 +1769,7 @@ const restoreLatestBackup = async () => {
 </div>
 
           <div className="shift-list">
-            {employees.map((emp) => {
+            {employees.filter((emp) => !isDavidEmployee(emp)).map((emp) => {
               const stats = calculateWeeklyHours(
                 emp.schedule || [],
                 weekStart,
@@ -1688,12 +1914,128 @@ const restoreLatestBackup = async () => {
       );
     }
 
+    if (activeTab === "david" && isAdmin) {
+      const startDate = davidAccount?.startDate
+        ? new Date(davidAccount.startDate).toLocaleDateString("es-ES")
+        : "pendiente";
+      const visibleMovements = showAllDavidMovements
+        ? davidMovements
+        : davidMovements.slice(0, 5);
+
+      return (
+        <section className="card david-panel">
+          <div className="section-header-row">
+            <div>
+              <h2 className="section-title">David</h2>
+            </div>
+            <div className="status-pill">1400 €/mes</div>
+          </div>
+
+          <div className="stats-grid david-stats">
+            <div className="stat-box highlighted">
+              <span className="stat-label">Saldo actual</span>
+              <strong className="stat-value">{formatMoney(davidBalance)}</strong>
+            </div>
+          </div>
+
+          <div className="card inner-card david-actions">
+            <h3 className="subsection-title">Pagar</h3>
+            <div className="row">
+              <input
+                className="input"
+                type="number"
+                inputMode="decimal"
+                placeholder="Cantidad"
+                value={davidPayAmount}
+                onChange={(e) => setDavidPayAmount(e.target.value)}
+              />
+              <button
+                className="primary-btn"
+                onClick={() => addDavidMovement("payment", davidPayAmount, "Pago parcial")}
+              >
+                Pagar cantidad
+              </button>
+            </div>
+            <button className="secondary-btn full-btn" onClick={payAllDavidBalance}>
+              Pagar todo
+            </button>
+          </div>
+
+          <div className="card inner-card david-actions">
+            <h3 className="subsection-title">Ajuste manual</h3>
+            <div className="row">
+              <input
+                className="input"
+                type="number"
+                inputMode="decimal"
+                placeholder="+ o - cantidad"
+                value={davidAdjustmentAmount}
+                onChange={(e) => setDavidAdjustmentAmount(e.target.value)}
+              />
+              <input
+                className="input"
+                placeholder="Motivo"
+                value={davidAdjustmentNote}
+                onChange={(e) => setDavidAdjustmentNote(e.target.value)}
+              />
+            </div>
+            <button
+              className="secondary-btn full-btn"
+              onClick={() =>
+                addDavidMovement(
+                  "adjustment",
+                  davidAdjustmentAmount,
+                  davidAdjustmentNote || "Ajuste manual"
+                )
+              }
+            >
+              Añadir ajuste manual
+            </button>
+          </div>
+
+          <div className="card inner-card david-actions">
+            <h3 className="subsection-title">Movimientos</h3>
+            {visibleMovements.length === 0 ? (
+              <p className="empty-state">Aún no hay movimientos.</p>
+            ) : (
+              <div className="movement-list">
+                {visibleMovements.map((movement) => (
+                  <div key={movement.id} className="movement-item">
+                    <div>
+                      <strong>
+                        {movement.type === "payment" ? "Pago" : "Ajuste"}
+                      </strong>
+                      <span>{formatMovementDate(movement.date)}</span>
+                      {movement.note && <small>{movement.note}</small>}
+                    </div>
+                    <b className={movement.amount < 0 ? "negative" : "positive"}>
+                      {movement.amount > 0 ? "+" : ""}
+                      {formatMoney(movement.amount)}
+                    </b>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {davidMovements.length > 5 && (
+              <button
+                className="secondary-btn full-btn"
+                onClick={() => setShowAllDavidMovements((v) => !v)}
+              >
+                {showAllDavidMovements ? "Ver menos movimientos" : "Ver más movimientos"}
+              </button>
+            )}
+          </div>
+        </section>
+      );
+    }
+
     if (activeTab === "history" && isAdmin) {
       return (
         <section className="card">
           <h2 className="section-title">Histórico de pagos</h2>
 
-          {employees.map((emp) => {
+          {employees.filter((emp) => !isDavidEmployee(emp)).map((emp) => {
   const payments = emp.payments || {};
   const weeks = Object.keys(payments);
 

@@ -5,6 +5,7 @@
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^7.1.1",
     "@capacitor/android": "^6.2.1",
+    "@capacitor/app": "^6.0.3",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/core": "^6.2.1",
     "@capacitor/local-notifications": "^6.1.3",
